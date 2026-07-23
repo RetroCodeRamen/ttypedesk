@@ -101,6 +101,8 @@ Native app panics are isolated to that window (red crash screen; Esc/Q closes it
 
 `~/.config/ttypedesk/config.json` — FPS, shell, theme, taskbar dock, desktop icons, wallpaper, notify, **file associations** / default apps, and Files options. See [docs/associations.md](docs/associations.md) and [docs/files.md](docs/files.md).
 
+The file is hot-reloaded: edit it directly (or let a second instance / sync tool write it) and the running desktop picks it up within ~2 seconds — no restart required.
+
 Defaults: **no terminal on start**; **restore last session** from `~/.config/ttypedesk/session.json` (toggle in Settings → Desktop). Set `open_terminal_on_start` if you want the old behavior.
 
 Default look is the **XP** theme (Windows XP–inspired chrome) with the **Bliss** wallpaper (`builtin:bliss`) — the most 2001 rectangle of grass ever committed to a git repo. Other packs: **Scarlet**, **Bumble**, **Bubble**, **Sprout** (Settings → Appearance, or palette: `scarlet` / `bumble` / …). Over SSH the desktop stays solid unless you set `wallpaper.ssh_mode` to `keep`, because streaming a bitmap wallpaper over a laggy SSH session is a great way to relearn patience.

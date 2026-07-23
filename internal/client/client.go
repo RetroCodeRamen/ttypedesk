@@ -93,6 +93,9 @@ type Client struct {
 	reminded       map[string]time.Time // calendar event id → reminder slot
 	lastRemindPoll time.Time
 
+	cfgModTime  time.Time // mtime of config.json we last applied (ours or external)
+	lastCfgPoll time.Time
+
 	attention map[string]bool // window id → needs taskbar attention (BEL)
 
 	findOpen   bool
@@ -139,6 +142,9 @@ func New(srv *server.Server, cfg config.Config, boot BootOptions) (*Client, erro
 		reminded:    make(map[string]time.Time),
 		attention:   make(map[string]bool),
 	}
+	if info, err := os.Stat(config.Path()); err == nil {
+		c.cfgModTime = info.ModTime()
+	}
 	c.buildStartMenu()
 	c.notify = srv.NotifyService()
 	if c.notify != nil {
@@ -169,13 +175,17 @@ func (c *Client) onNotice(n notify.Notice) {
 	c.layoutDirty = true
 }
 
-// ApplyConfig hot-applies settings from the Settings app.
+// ApplyConfig hot-applies settings, whether saved from the Settings app or
+// picked up from an external edit to config.json (see pollConfigReload).
 func (c *Client) ApplyConfig(cfg config.Config) {
 	c.cfg = cfg
 	c.srv.SetDock(cfg.TaskbarDock())
 	c.buildStartMenu()
 	c.wall.Invalidate()
 	c.layoutDirty = true
+	if info, err := os.Stat(config.Path()); err == nil {
+		c.cfgModTime = info.ModTime()
+	}
 }
 
 func (c *Client) Close() {
@@ -298,6 +308,7 @@ func (c *Client) Run() error {
 				}
 				c.srv.RefreshTitles()
 				c.pollCalendarReminders()
+				c.pollConfigReload()
 				c.draw()
 				if c.cfg.RestoreSession && time.Since(lastSave) >= 30*time.Second {
 					c.saveSession()

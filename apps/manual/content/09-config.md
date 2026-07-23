@@ -12,6 +12,8 @@
 
 Override log path with `TTYPEDESK_LOG`; level with `TTYPEDESK_LOG_LEVEL=debug|info|warn|error`.
 
+**Hot reload:** `config.json` is watched for changes — edit it by hand (or let another tool write it) and the running desktop picks it up within a couple seconds, no restart needed. Saving from within Settings applies the same way, just instantly instead of on the next poll.
+
 ## SSH
 
 Desk detects SSH (`SSH_CONNECTION` / `SSH_TTY`) and can:

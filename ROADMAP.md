@@ -96,7 +96,7 @@ A real **Settings** window (native `uiapp`), not only editing JSON by hand — t
 - [x] **App roles** — `role:terminal` / `{editor}` / `{browser}` / `{filemgr}` / `{image}` expand via `Roles` (browser unset until configured)
 - [x] **Autostart / startup layout** — `autostart: ["terminal","notes",…]` LaunchAction list (Settings → Desktop); session restore remains separate
 - [x] **Remappable hotkeys** — Settings → Input; `hotkeys` map in config (`f3`, `alt+/`, `ctrl+shift+f`, …)
-- [ ] Hot reload of theme/desktop icons where practical
+- [x] Hot reload of theme/desktop icons where practical — external edits to `config.json` (hand-edited, synced, written by another instance) are picked up within ~2s and applied live via the same path Settings-app Save already uses; no restart needed
 
 ## Universal command palette (distinctive)
 
