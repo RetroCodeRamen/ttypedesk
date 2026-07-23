@@ -49,6 +49,7 @@ That's it. No installer wizard, no EULA, no "would you like to also install a br
 | Ctrl+Shift+C | Copy selection (also auto-copies on mouse-up) |
 | Wheel | Scrollback |
 | Shift+PgUp / Shift+PgDn | Scrollback |
+| **F8** | Copy-mode — keyboard scrollback selection (hjkl/arrows, Space/v select, Enter/y copy, Esc cancel) |
 | Ctrl+Shift+F | Find in scrollback (often stolen by Guake / host terminals) |
 | **F3** / **Alt+/** | Find in scrollback (remappable: Settings → Input) |
 | **Ctrl+Space** / **Ctrl+P** | Command palette |

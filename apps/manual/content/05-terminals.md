@@ -21,6 +21,19 @@ Scrollback depth is configurable in **Settings → Terminal & performance** (`sc
 - **Middle-click** or **Ctrl+V** pastes
 - OSC 52 may also sync with the host clipboard when supported
 
+## Copy-mode (keyboard scrollback selection)
+
+Mouse-free, tmux-style: select and copy scrollback entirely from the keyboard.
+
+- **F8** — enter copy-mode on the focused terminal (cyan bar at the bottom)
+- **Arrows** or **hjkl** — move the cursor, scrolling into history at the top/bottom edge
+- **PgUp / PgDn** — page the view; **g** / **G** — jump to the top / bottom of history
+- **Space** or **v** — start (or stop) selecting; movement after that extends the selection
+- **Enter** or **y** — copy the selection and exit copy-mode
+- **Esc** or **q** — cancel and exit without copying
+
+Remappable in **Settings → Input**, alongside the other Desk hotkeys.
+
 ## Attention (BEL)
 
 When a program rings the terminal bell, that window’s taskbar chip can flash until you focus it.

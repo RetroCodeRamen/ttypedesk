@@ -4,39 +4,41 @@ import "strings"
 
 // Hotkey action IDs (keys in Hotkeys map).
 const (
-	HKQuit       = "quit"
-	HKFind       = "find"
-	HKFindAlt    = "find_alt"
-	HKFindLegacy = "find_legacy"
+	HKQuit            = "quit"
+	HKFind            = "find"
+	HKFindAlt         = "find_alt"
+	HKFindLegacy      = "find_legacy"
 	HKStartMenu       = "start_menu"
 	HKStartMenuAlt    = "start_menu_alt"
 	HKStartMenuLegacy = "start_menu_legacy"
 	HKClose           = "close"
-	HKMinimize   = "minimize"
-	HKCopy       = "copy"
-	HKPaste      = "paste"
-	HKCycleFocus = "cycle_focus"
-	HKPalette    = "palette"
-	HKPaletteAlt = "palette_alt"
+	HKMinimize        = "minimize"
+	HKCopy            = "copy"
+	HKPaste           = "paste"
+	HKCopyMode        = "copy_mode"
+	HKCycleFocus      = "cycle_focus"
+	HKPalette         = "palette"
+	HKPaletteAlt      = "palette_alt"
 )
 
 // DefaultHotkeys are Desk-level bindings (not forwarded into PTYs when matched).
 func DefaultHotkeys() map[string]string {
 	return map[string]string{
-		HKQuit:       "ctrl+q",
-		HKFind:       "f3",
-		HKFindAlt:    "alt+/",
-		HKFindLegacy: "ctrl+shift+f",
+		HKQuit:            "ctrl+q",
+		HKFind:            "f3",
+		HKFindAlt:         "alt+/",
+		HKFindLegacy:      "ctrl+shift+f",
 		HKStartMenu:       "f10",
 		HKStartMenuAlt:    "ctrl+esc",
 		HKStartMenuLegacy: "alt+space",
 		HKClose:           "ctrl+w",
-		HKMinimize:   "ctrl+m",
-		HKCopy:       "ctrl+shift+c",
-		HKPaste:      "ctrl+shift+v",
-		HKCycleFocus: "alt+tab",
-		HKPalette:    "ctrl+space",
-		HKPaletteAlt: "ctrl+p",
+		HKMinimize:        "ctrl+m",
+		HKCopy:            "ctrl+shift+c",
+		HKPaste:           "ctrl+shift+v",
+		HKCopyMode:        "f8",
+		HKCycleFocus:      "alt+tab",
+		HKPalette:         "ctrl+space",
+		HKPaletteAlt:      "ctrl+p",
 	}
 }
 
@@ -65,6 +67,8 @@ func HotkeyLabel(action string) string {
 		return "Copy selection"
 	case HKPaste:
 		return "Paste clipboard"
+	case HKCopyMode:
+		return "Copy-mode (keyboard scrollback selection)"
 	case HKCycleFocus:
 		return "Cycle window focus"
 	case HKPalette:
@@ -81,7 +85,7 @@ func HotkeyActions() []string {
 	return []string{
 		HKPalette, HKPaletteAlt, HKFind, HKFindAlt, HKFindLegacy,
 		HKStartMenu, HKStartMenuAlt, HKStartMenuLegacy,
-		HKClose, HKMinimize, HKCopy, HKPaste, HKCycleFocus, HKQuit,
+		HKClose, HKMinimize, HKCopy, HKPaste, HKCopyMode, HKCycleFocus, HKQuit,
 	}
 }
 

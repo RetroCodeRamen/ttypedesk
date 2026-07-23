@@ -28,6 +28,7 @@
 | Middle-click / Ctrl+V | Paste |
 | Ctrl+Shift+F | Find in scrollback (host may steal this) |
 | F3 / Alt+/ | Find in scrollback (preferred) |
+| **F8** | Copy-mode — keyboard scrollback selection (hjkl/arrows, Space/v select, Enter/y copy) |
 
 ## Manual reader
 

@@ -147,7 +147,7 @@ See [docs/gui-bridge.md](docs/gui-bridge.md).
 
 ## Terminal
 
-- [ ] Keyboard copy-mode (tmux-like)
+- [x] Keyboard copy-mode (tmux-like) — **F8**; hjkl/arrows move (scrolling into history at the edges), PgUp/PgDn page, g/G jump top/bottom, Space/v select, Enter/y copy, Esc/q cancel. Reuses the existing mouse-selection render/copy path.
 - [x] Scrollback scrollbar / indicator (wheel + right-border bar; drag thumb / arrows / page track)
 - [x] Scrollback search — **F3** / **Alt+/** find bar (Ctrl+Shift+F if host allows); Enter / Shift+Enter; yellow highlights
 - [x] Better system clipboard — OSC 52 plus `wl-copy` / `xclip` / `xsel` fallbacks

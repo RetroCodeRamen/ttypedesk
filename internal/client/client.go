@@ -39,11 +39,11 @@ type Client struct {
 	boot   BootOptions
 	quit   bool
 
-	menuOpen  bool
-	menuIdx   int
-	subOpen   int // index into menuRoot with open flyout; -1 = none
-	subIdx    int
-	menuRoot  []startMenuItem
+	menuOpen bool
+	menuIdx  int
+	subOpen  int // index into menuRoot with open flyout; -1 = none
+	subIdx   int
+	menuRoot []startMenuItem
 
 	dragID     string
 	dragMode   string
@@ -73,13 +73,15 @@ type Client struct {
 	mouseDownID string
 
 	// text selection (Shift+drag, or drag when guest mouse mode is off)
-	selecting    bool
-	selWin       string
-	selX0, selY0 int
-	selX1, selY1 int
-	hasSel       bool
-	cursorOn     bool // blink phase
-	lastBlink    time.Time
+	selecting     bool
+	selWin        string
+	selX0, selY0  int
+	selX1, selY1  int
+	hasSel        bool
+	copyMode      bool // tmux-like keyboard scrollback selection (F8)
+	copySelecting bool // anchor fixed; cursor (selX1/selY1) extends the selection
+	cursorOn      bool // blink phase
+	lastBlink     time.Time
 
 	wall   wallpaper.Cache
 	notify *notify.Service
@@ -362,6 +364,9 @@ func (c *Client) handleKey(e *tcell.EventKey) {
 		c.quit = true
 		return
 	}
+	if c.copyMode && c.handleCopyModeKey(e) {
+		return
+	}
 	if c.findOpen && c.handleFindKey(e) {
 		return
 	}
@@ -374,6 +379,10 @@ func (c *Client) handleKey(e *tcell.EventKey) {
 	}
 	if c.matchHK(config.HKFind, e) || c.matchHK(config.HKFindAlt, e) || c.matchHK(config.HKFindLegacy, e) {
 		c.openFind()
+		return
+	}
+	if c.matchHK(config.HKCopyMode, e) {
+		c.openCopyMode()
 		return
 	}
 	if c.matchHK(config.HKCopy, e) {
@@ -1401,6 +1410,7 @@ func (c *Client) draw() {
 		c.drawMenu()
 	}
 	c.drawFindBar()
+	c.drawCopyModeBar()
 	c.drawPalette()
 
 	c.layoutDirty = false
