@@ -202,8 +202,12 @@ func (a *App) activate() {
 			idx := a.sel - 7
 			if idx >= 0 && idx < len(packs) {
 				p := packs[idx]
-				_ = a.cfg.ApplyThemePack(p.ID)
-				a.status = fmt.Sprintf("%s theme — %s", p.Name, p.Tagline)
+				if a.cfg.ApplyThemePack(p.ID) {
+					if a.onSave != nil {
+						a.onSave(a.cfg)
+					}
+					a.status = fmt.Sprintf("%s theme — %s (applied)", p.Name, p.Tagline)
+				}
 			}
 		}
 	case 2: // terminal
