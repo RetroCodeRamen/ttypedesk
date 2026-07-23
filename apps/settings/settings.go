@@ -109,10 +109,6 @@ func (a *App) key(e uiapp.Event) error {
 		a.sel++
 	case "Enter":
 		a.activate()
-	default:
-		if e.Rune == 's' || e.Rune == 'S' {
-			a.save()
-		}
 	}
 	return nil
 }
@@ -120,7 +116,7 @@ func (a *App) key(e uiapp.Event) error {
 func (a *App) activate() {
 	switch a.page {
 	case 0:
-		items := 10
+		items := 9
 		if a.sel >= items {
 			a.sel = items - 1
 		}
@@ -143,23 +139,24 @@ func (a *App) activate() {
 			a.page, a.sel = 8, 0
 		case 8:
 			a.page, a.sel = 9, 0
-		case 9:
-			a.save()
 		}
 	case 1: // appearance
 		switch a.sel {
 		case 0:
 			a.cfg.Wallpaper.Mode = "pattern"
 			a.cfg.Theme.DesktopPattern = "░"
+			a.persist()
 			a.status = "Wallpaper: pattern ░"
 		case 1:
 			a.cfg.Wallpaper.Mode = "solid"
 			a.cfg.Theme.DesktopPattern = ""
+			a.persist()
 			a.status = "Wallpaper: solid"
 		case 2:
 			a.cfg.Wallpaper.Mode = "image"
 			a.cfg.Wallpaper.Path = "builtin:bliss"
 			a.cfg.Wallpaper.Fit = "cover"
+			a.persist()
 			a.status = "Wallpaper: Bliss (XP default)"
 		case 3:
 			a.editing = true
@@ -184,6 +181,7 @@ func (a *App) activate() {
 				}
 			}
 			a.cfg.Wallpaper.Fit = next
+			a.persist()
 			a.status = "Fit: " + next
 		case 6:
 			switch a.cfg.TaskbarDock() {
@@ -196,6 +194,7 @@ func (a *App) activate() {
 			default:
 				a.cfg.Taskbar.Dock = "top"
 			}
+			a.persist()
 			a.status = "Taskbar: " + a.cfg.Taskbar.Dock
 		default:
 			packs := config.ThemePacks()
@@ -203,9 +202,7 @@ func (a *App) activate() {
 			if idx >= 0 && idx < len(packs) {
 				p := packs[idx]
 				if a.cfg.ApplyThemePack(p.ID) {
-					if a.onSave != nil {
-						a.onSave(a.cfg)
-					}
+					a.persist()
 					a.status = fmt.Sprintf("%s theme — %s (applied)", p.Name, p.Tagline)
 				}
 			}
@@ -233,9 +230,11 @@ func (a *App) activate() {
 		switch a.sel {
 		case 0:
 			a.cfg.ShowDesktopIcons = !a.cfg.ShowDesktopIcons
+			a.persist()
 			a.status = fmt.Sprintf("Desktop icons: %v", a.cfg.ShowDesktopIcons)
 		case 1:
 			a.cfg.SolidDesktopOnSSH = !a.cfg.SolidDesktopOnSSH
+			a.persist()
 			a.status = fmt.Sprintf("Solid desktop on SSH: %v", a.cfg.SolidDesktopOnSSH)
 		case 2:
 			if a.cfg.Wallpaper.SSHMode == "solid" {
@@ -243,12 +242,15 @@ func (a *App) activate() {
 			} else {
 				a.cfg.Wallpaper.SSHMode = "solid"
 			}
+			a.persist()
 			a.status = "Wallpaper SSH mode: " + a.cfg.Wallpaper.SSHMode
 		case 3:
 			a.cfg.RestoreSession = !a.cfg.RestoreSession
+			a.persist()
 			a.status = fmt.Sprintf("Restore last session: %v", a.cfg.RestoreSession)
 		case 4:
 			a.cfg.OpenTerminalOnStart = !a.cfg.OpenTerminalOnStart
+			a.persist()
 			a.status = fmt.Sprintf("Open terminal on start: %v", a.cfg.OpenTerminalOnStart)
 		case 5:
 			a.editing = true
@@ -256,12 +258,14 @@ func (a *App) activate() {
 			a.status = "Autostart actions (comma-separated) — e.g. terminal, notes, calendar"
 		case 6:
 			a.cfg.DesktopIcons = config.DefaultDesktopIcons()
+			a.persist()
 			a.status = "Reset desktop icons"
 		}
 	case 4: // notifications
 		switch a.sel {
 		case 0:
 			a.cfg.Notify.Banners = !a.cfg.Notify.Banners
+			a.persist()
 			a.status = fmt.Sprintf("Banners: %v", a.cfg.Notify.Banners)
 		case 1:
 			a.editing = true
@@ -269,9 +273,11 @@ func (a *App) activate() {
 			a.status = "Banner dismiss seconds"
 		case 2:
 			a.cfg.Notify.SSHBadgeOnly = !a.cfg.Notify.SSHBadgeOnly
+			a.persist()
 			a.status = fmt.Sprintf("SSH badge-only: %v", a.cfg.Notify.SSHBadgeOnly)
 		case 3:
 			a.cfg.Notify.Persist = !a.cfg.Notify.Persist
+			a.persist()
 			a.status = fmt.Sprintf("Persist history: %v", a.cfg.Notify.Persist)
 		case 4:
 			a.editing = true
@@ -305,6 +311,7 @@ func (a *App) activate() {
 				}
 			}
 			a.cfg.Roles.Editor = next
+			a.persist()
 			a.status = "Default editor: " + next
 		case 1:
 			a.editing = true
@@ -315,6 +322,7 @@ func (a *App) activate() {
 			a.status = "Custom editor command — Enter (stored as pty:<cmd>)"
 		case 2:
 			a.cfg.Roles.Image = "image"
+			a.persist()
 			a.status = "Image app: Image Viewer"
 		case 3:
 			browsers := []string{"", "pty:lynx", "pty:w3m", "pty:elinks"}
@@ -327,6 +335,7 @@ func (a *App) activate() {
 				}
 			}
 			a.cfg.Roles.Browser = next
+			a.persist()
 			if next == "" {
 				a.status = "Browser role: (unset)"
 			} else {
@@ -341,6 +350,7 @@ func (a *App) activate() {
 			a.status = "Custom browser command — Enter (pty:<cmd>), empty clears"
 		case 5:
 			a.cfg.Associations = config.DefaultAssociations()
+			a.persist()
 			a.status = "Reset file associations to defaults"
 		}
 	case 6: // apps / Start menu
@@ -375,9 +385,11 @@ func (a *App) activate() {
 			} else {
 				a.cfg.Roles.Terminal = "terminal"
 			}
+			a.persist()
 			a.status = "Terminal role: " + a.cfg.Roles.Terminal
 		case 4:
 			a.cfg.Roles.FileMgr = "files"
+			a.persist()
 			a.status = "File manager role: files"
 		case 5:
 			if a.ctx != nil {
@@ -396,6 +408,7 @@ func (a *App) activate() {
 			a.status = "Binding e.g. f3, alt+/, ctrl+shift+f — Enter apply, Esc cancel"
 		case a.sel == len(actions):
 			a.cfg.Palette.StartOpensPalette = !a.cfg.Palette.StartOpensPalette
+			a.persist()
 			if a.cfg.Palette.StartOpensPalette {
 				a.status = "Start opens command palette"
 			} else {
@@ -403,9 +416,11 @@ func (a *App) activate() {
 			}
 		case a.sel == len(actions)+1:
 			a.cfg.Palette.ASCIIIcons = !a.cfg.Palette.ASCIIIcons
+			a.persist()
 			a.status = fmt.Sprintf("ASCII icon substitutes: %v", a.cfg.Palette.ASCIIIcons)
 		case a.sel == len(actions)+2:
 			a.cfg.Hotkeys = config.DefaultHotkeys()
+			a.persist()
 			a.status = "Hotkeys reset to defaults"
 		}
 	case 8: // advanced
@@ -428,6 +443,7 @@ func (a *App) activate() {
 }
 
 func (a *App) commitEdit() {
+	defer a.persist()
 	switch a.page {
 	case 1:
 		if a.sel == 3 {
@@ -533,11 +549,10 @@ func (a *App) commitEdit() {
 	}
 }
 
-func (a *App) save() {
+func (a *App) persist() {
 	if a.onSave != nil {
 		a.onSave(a.cfg)
 	}
-	a.status = "Saved " + config.Path()
 }
 
 func (a *App) Draw(cv *uiapp.Canvas) error {
@@ -574,7 +589,7 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 		}
 		cv.DrawText(1, y, line, f, b, 0)
 	}
-	help := "↑↓ Enter  Esc=back  S=save"
+	help := "↑↓ Enter  Esc=back  (changes save automatically)"
 	if a.status != "" {
 		help = a.status
 	}
@@ -598,7 +613,6 @@ func (a *App) lines() []string {
 			"Input (hotkeys)",
 			"Advanced",
 			"About",
-			"Save configuration",
 		}
 	case 1:
 		path := a.cfg.Wallpaper.Path
