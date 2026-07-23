@@ -1,5 +1,7 @@
 # TTYPE Desk
 
+[![GitHub](https://img.shields.io/badge/GitHub-RetroCodeRamen%2Fttypedesk-181717?logo=github)](https://github.com/RetroCodeRamen/ttypedesk)
+
 DOS-era floating window manager for the Linux terminal — **TTYPE Desk**.
 
 Multiplexes real TUI programs (bash, vim, htop) via **libvterm**, hosts native apps through an in-process **App SDK**, and can render images as truecolor half-block “graphics.”
