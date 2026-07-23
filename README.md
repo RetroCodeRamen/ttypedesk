@@ -116,11 +116,11 @@ Panics and LaunchAction failures are written here — check this file when somet
 # session host
 ./bin/ttypedesk -listen /tmp/ttypedesk.sock
 
-# another terminal (read-only snapshot viewer)
+# another terminal — type and click into whatever's focused/on-screen, Ctrl+Q to detach
 ./bin/ttypedesk -attach /tmp/ttypedesk.sock
 ```
 
-See [docs/remote.md](docs/remote.md) for how a future RDP/VNC decoder plugs in as a graphical surface.
+Keyboard and mouse (press/drag/release/wheel) forward to the host; window chrome — dragging, resizing, taskbar, Start menu — is still host-side only. See [docs/remote.md](docs/remote.md) for how a future RDP/VNC decoder plugs in as a graphical surface.
 
 ## Roadmap
 

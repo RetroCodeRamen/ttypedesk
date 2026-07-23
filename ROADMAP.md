@@ -210,7 +210,7 @@ Avoid building around Discord/Slack as the primary path (proprietary APIs / ToS)
 
 ## Remote attach
 
-- [ ] Bidirectional attach (input over socket)
+- [x] Bidirectional attach (input over socket) — keyboard to focused window; mouse press/drag/release/wheel hit-tests and forwards into content area, focusing on press. Window chrome (drag/resize/taskbar/Start menu) still local-only.
 - [ ] Binary cell-diff framing (replace JSON snapshots)
 
 ## Audio streaming (later — after main desktop)

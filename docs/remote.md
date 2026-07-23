@@ -28,7 +28,7 @@ Details: [gui-bridge.md](gui-bridge.md).
 - `attach` — hello
 - `snapshot` — full window list + cell grids (truecolor RGB)
 
-`-attach` is read-only today. Bidirectional input is planned; message types (`key`, `mouse`, `resize`, `focus`) already exist.
+`-attach` is bidirectional: keyboard input forwards to whatever window is focused on the host, and mouse press/drag/release/wheel hit-test the window under the pointer (focusing it on press) and forward into its content area — the same path local PTY/app mouse input takes. Window chrome (title-bar drag, resize grips, taskbar, Start menu) is not remoted yet; that stays a local-only interaction for now. Detach with **Ctrl+Q**.
 
 ## True color
 
