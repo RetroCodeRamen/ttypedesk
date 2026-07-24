@@ -101,15 +101,16 @@ type Recipe struct {
 
 // PaletteCfg tunes the command palette.
 type PaletteCfg struct {
-	MaxResults       int  `json:"max_results"`
+	MaxResults        int  `json:"max_results"`
 	StartOpensPalette bool `json:"start_opens_palette"` // Start button / Start hotkey opens palette
-	ASCIIIcons       bool `json:"ascii_icons"`          // draw ASCII substitutes for emoji icons
+	ASCIIIcons        bool `json:"ascii_icons"`         // draw ASCII substitutes for emoji icons
 }
 
 // AppSource is a catalog repo the App Store fetches index.json from.
 type AppSource struct {
-	Repo   string `json:"repo"`             // "owner/repo"
-	Branch string `json:"branch,omitempty"` // defaults to "main" if empty
+	Repo    string `json:"repo"`              // "owner/repo"
+	Branch  string `json:"branch,omitempty"`  // defaults to "main" if empty
+	Trusted bool   `json:"trusted,omitempty"` // install scripts run unsandboxed; App Store warns once per untrusted source, then persists this
 }
 
 // MinScrollback is the smallest scrollback depth (in lines) any terminal
@@ -118,16 +119,16 @@ const MinScrollback = 1000
 
 // Config is the application configuration.
 type Config struct {
-	FPS                 int           `json:"fps"`
-	SSHFPS              int           `json:"ssh_fps"`
-	Shell               string        `json:"shell"`
-	Scrollback          int           `json:"scrollback"`
-	ShowDesktopIcons    bool          `json:"show_desktop_icons"`
-	SolidDesktopOnSSH   bool          `json:"solid_desktop_on_ssh"`
-	RestoreSession      bool          `json:"restore_session"`
-	OpenTerminalOnStart bool          `json:"open_terminal_on_start"`
-	Autostart           []string      `json:"autostart"` // LaunchAction strings after session restore
-	Theme               Theme         `json:"theme"`
+	FPS                 int               `json:"fps"`
+	SSHFPS              int               `json:"ssh_fps"`
+	Shell               string            `json:"shell"`
+	Scrollback          int               `json:"scrollback"`
+	ShowDesktopIcons    bool              `json:"show_desktop_icons"`
+	SolidDesktopOnSSH   bool              `json:"solid_desktop_on_ssh"`
+	RestoreSession      bool              `json:"restore_session"`
+	OpenTerminalOnStart bool              `json:"open_terminal_on_start"`
+	Autostart           []string          `json:"autostart"` // LaunchAction strings after session restore
+	Theme               Theme             `json:"theme"`
 	Taskbar             TaskbarCfg        `json:"taskbar"`
 	DesktopIcons        []DesktopIcon     `json:"desktop_icons"`
 	Programs            []Program         `json:"programs"`
@@ -169,10 +170,10 @@ func Default() Config {
 		shell = "/bin/bash"
 	}
 	return Config{
-		FPS:               30,
-		SSHFPS:            15,
-		Shell:             shell,
-		Scrollback:        2000,
+		FPS:                 30,
+		SSHFPS:              15,
+		Shell:               shell,
+		Scrollback:          2000,
 		ShowDesktopIcons:    true,
 		SolidDesktopOnSSH:   true,
 		RestoreSession:      true,
@@ -209,7 +210,7 @@ func Default() Config {
 			{Match: "install doom", Action: "pty:bash -lc sudo apt install chocolate-doom", Confirm: true},
 		},
 		AppSources: []AppSource{
-			{Repo: "RetroCodeRamen/ttypedesk-apps", Branch: "main"},
+			{Repo: "RetroCodeRamen/ttypedesk-apps", Branch: "main", Trusted: true},
 		},
 	}
 }

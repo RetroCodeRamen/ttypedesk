@@ -55,17 +55,22 @@ type App struct {
 	loadErr string
 	closing bool
 
+	// confirmIdx is the row index awaiting a second Enter/click to trust
+	// its source and proceed; -1 when nothing is pending.
+	confirmIdx int
+
 	loadCh    chan loadResult
 	installCh chan installResult
 }
 
 func New(cfg config.Config, onSave func(config.Config)) *App {
 	return &App{
-		cfg:       cfg,
-		onSave:    onSave,
-		loading:   true,
-		loadCh:    make(chan loadResult, 1),
-		installCh: make(chan installResult, 4),
+		cfg:        cfg,
+		onSave:     onSave,
+		loading:    true,
+		confirmIdx: -1,
+		loadCh:     make(chan loadResult, 1),
+		installCh:  make(chan installResult, 4),
 	}
 }
 
@@ -134,6 +139,7 @@ func (a *App) onTimer() {
 		a.loading = false
 		a.rows = res.rows
 		a.loadErr = res.err
+		a.confirmIdx = -1
 		for i := range a.rows {
 			if detectEntry(a.rows[i].entry) {
 				a.rows[i].state = statusInstalled
@@ -182,18 +188,24 @@ func (a *App) key(e uiapp.Event) error {
 	case "Up":
 		if a.sel > 0 {
 			a.sel--
+			a.confirmIdx = -1
 		}
 	case "Down":
 		if a.sel+1 < n {
 			a.sel++
+			a.confirmIdx = -1
 		}
 	case "Enter":
-		a.activate()
+		a.requestInstall()
 	case "Escape":
-		a.closing = true
+		if a.confirmIdx != -1 {
+			a.confirmIdx = -1
+		} else {
+			a.closing = true
+		}
 	default:
 		if e.Rune == ' ' {
-			a.activate()
+			a.requestInstall()
 		}
 	}
 	return nil
@@ -211,11 +223,52 @@ func (a *App) mouse(e uiapp.Event) error {
 		return nil
 	}
 	if idx == a.sel {
-		a.activate()
+		a.requestInstall()
 	} else {
 		a.sel = idx
+		a.confirmIdx = -1
 	}
 	return nil
+}
+
+// requestInstall activates the selected row, gating on source trust first.
+// Install scripts run unsandboxed and may invoke sudo, so a source that
+// hasn't been trusted yet gets one warning: the first Enter/click arms
+// confirmIdx instead of installing, and a second Enter/click on the same
+// row trusts the source (persisted to config) before proceeding.
+func (a *App) requestInstall() {
+	if a.sel < 0 || a.sel >= len(a.rows) {
+		return
+	}
+	r := a.rows[a.sel]
+	if r.state == statusInstalling || r.state == statusInstalled {
+		return
+	}
+	if !r.src.Trusted && a.confirmIdx != a.sel {
+		a.confirmIdx = a.sel
+		return
+	}
+	a.confirmIdx = -1
+	a.trustSource(a.sel)
+	a.activate()
+}
+
+// trustSource marks the row's source trusted, both on the row (so the
+// warning doesn't reappear this session) and in cfg.AppSources (so it
+// persists). No-op if already trusted.
+func (a *App) trustSource(idx int) {
+	if idx < 0 || idx >= len(a.rows) || a.rows[idx].src.Trusted {
+		return
+	}
+	a.rows[idx].src.Trusted = true
+	for i := range a.cfg.AppSources {
+		src := &a.cfg.AppSources[i]
+		if src.Repo == a.rows[idx].src.Repo && src.Branch == a.rows[idx].src.Branch {
+			src.Trusted = true
+			break
+		}
+	}
+	a.persist()
 }
 
 // activate installs the selected row if it's eligible (not already
@@ -290,6 +343,9 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 				icon = "📦"
 			}
 			line := fmt.Sprintf("%s %-20s [%s]", icon, r.entry.Name, statusLabel(r.state))
+			if !r.src.Trusted && r.state != statusInstalled {
+				line += "  ⚠ unverified source"
+			}
 			cv.DrawText(1, y, uwidth.Truncate(line, cols-2), f, b, 0)
 		}
 	}
@@ -297,12 +353,14 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 	help := "↑↓ select  Enter install  Esc close"
 	if a.sel >= 0 && a.sel < len(a.rows) {
 		r := a.rows[a.sel]
-		switch r.state {
-		case statusInstalling:
+		switch {
+		case a.confirmIdx == a.sel:
+			help = "⚠ " + r.src.Repo + " isn't trusted — install script runs unsandboxed, may use sudo. Enter again to trust & install, Esc to cancel."
+		case r.state == statusInstalling:
 			help = r.entry.Name + ": installing — see the new terminal window"
-		case statusInstalled:
+		case r.state == statusInstalled:
 			help = r.entry.Name + ": installed"
-		case statusError:
+		case r.state == statusError:
 			help = r.entry.Name + ": " + r.errMsg
 		default:
 			if r.entry.Description != "" {

@@ -31,8 +31,24 @@ Default (and reference) catalog:
 | Input | Action |
 |-------|--------|
 | ↑↓ / click | Select entry |
-| Enter / Space | Install selected entry (or retry after an error) |
-| Esc | Close |
+| Enter / Space | Install selected entry (or retry after an error) — see Trust below |
+| Esc | Close (or cancel a pending trust confirmation) |
+
+## Trust / warning
+
+Install scripts run unsandboxed and may invoke `sudo` — there's no
+sandboxing between the script and your account. A source's entries show
+`⚠ unverified source` until you trust it:
+
+- The **first** Enter/Space/click on an entry from an untrusted source arms
+  a warning in the status bar instead of installing.
+- A **second** Enter/Space/click on the same entry trusts that source —
+  persisted to `app_sources[].trusted` in config — and proceeds with the
+  install. Every other entry from that source is trusted too from then on.
+- Esc while the warning is armed cancels it without installing.
+
+The default catalog (`RetroCodeRamen/ttypedesk-apps`) ships trusted by
+default; any source you add by hand gets the warning once.
 
 ## Catalog entry shape (`index.json`)
 
@@ -68,17 +84,20 @@ Default (and reference) catalog:
 
 ```json
 "app_sources": [
-  { "repo": "RetroCodeRamen/ttypedesk-apps", "branch": "main" }
+  { "repo": "RetroCodeRamen/ttypedesk-apps", "branch": "main", "trusted": true }
 ]
 ```
 
-`branch` defaults to `main` if omitted. Add more objects to pull from
-additional catalogs — later sources' entries are simply appended to the
-list.
+`branch` defaults to `main` if omitted. `trusted` defaults to `false` (see
+Trust above) — set it by hand to skip the in-app confirmation, or just
+confirm once in the App Store and let it persist itself. Add more objects
+to pull from additional catalogs — later sources' entries are simply
+appended to the list.
 
 ## Notes
 
 - No sandboxing: install scripts run with the current user's shell
-  permissions. Only add sources you trust.
+  permissions. Trusting a source is a one-time gate, not a sandbox — only
+  trust sources you'd run a script from directly.
 - Network failures on a source are shown inline ("Couldn't reach a
   source: …") rather than blocking the other configured sources.

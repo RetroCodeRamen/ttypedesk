@@ -164,7 +164,7 @@ Start ▸ App Store — install extra apps from configured GitHub catalogs (fetc
 - [x] Catalog fetch from one or more `app_sources` repos
 - [x] Detect / install / auto-register flow with Start ▸ Programs
 - [x] Default catalog: [ttypedesk-apps](https://github.com/RetroCodeRamen/ttypedesk-apps)
-- [ ] Per-source trust/warning UI (scripts run unsandboxed)
+- [x] Per-source trust/warning UI (scripts run unsandboxed) — confirm-to-trust, persisted per source
 
 ## Apps & platform
 
