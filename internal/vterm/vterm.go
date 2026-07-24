@@ -10,14 +10,21 @@ package vterm
 #include <stdint.h>
 #include <stdbool.h>
 
-extern int goDamage(int start_row, int end_row, int start_col, int end_col, void *user);
-extern int goMovecursor(int row, int col, int oldrow, int oldcol, int visible, void *user);
-extern int goSettermprop(int prop, int bool_val, int number_val, const char *str, int str_len, void *user);
-extern int goBell(void *user);
-extern int goSBPushCells(int cols, uint32_t *chars, uint8_t *fg, uint8_t *bg, uint8_t *attrs, void *user);
-extern int goSBPop(int cols, void *user);
-extern int goSBClear(void *user);
-extern void goOutput(const char *s, size_t len, void *user);
+// user is a runtime/cgo.Handle threaded through C as a plain integer, never
+// as a pointer. cgo.Handle values are opaque tokens, not addresses of Go
+// memory; converting one straight to unsafe.Pointer on the Go side violates
+// the unsafe.Pointer rules and can fatal with "checkptr: pointer arithmetic
+// computed bad pointer value" under load (observed via rapid PTY creation).
+// Casting between uintptr_t and void* only ever happens here in C, where
+// Go's pointer checker doesn't apply.
+extern int goDamage(int start_row, int end_row, int start_col, int end_col, uintptr_t user);
+extern int goMovecursor(int row, int col, int oldrow, int oldcol, int visible, uintptr_t user);
+extern int goSettermprop(int prop, int bool_val, int number_val, const char *str, int str_len, uintptr_t user);
+extern int goBell(uintptr_t user);
+extern int goSBPushCells(int cols, uint32_t *chars, uint8_t *fg, uint8_t *bg, uint8_t *attrs, uintptr_t user);
+extern int goSBPop(int cols, uintptr_t user);
+extern int goSBClear(uintptr_t user);
+extern void goOutput(const char *s, size_t len, uintptr_t user);
 
 static void indexed_to_rgb(uint8_t idx, uint8_t *r, uint8_t *g, uint8_t *b) {
   if (idx < 16) {
@@ -49,10 +56,10 @@ static void color_to_rgb(VTermColor col, uint8_t *r, uint8_t *g, uint8_t *b) {
 }
 
 static int c_damage(VTermRect rect, void *user) {
-  return goDamage(rect.start_row, rect.end_row, rect.start_col, rect.end_col, user);
+  return goDamage(rect.start_row, rect.end_row, rect.start_col, rect.end_col, (uintptr_t)user);
 }
 static int c_movecursor(VTermPos pos, VTermPos oldpos, int visible, void *user) {
-  return goMovecursor(pos.row, pos.col, oldpos.row, oldpos.col, visible, user);
+  return goMovecursor(pos.row, pos.col, oldpos.row, oldpos.col, visible, (uintptr_t)user);
 }
 static int c_settermprop(VTermProp prop, VTermValue *val, void *user) {
   int b = 0, n = 0;
@@ -80,9 +87,9 @@ static int c_settermprop(VTermProp prop, VTermValue *val, void *user) {
         break;
     }
   }
-  return goSettermprop((int)prop, b, n, s, sl, user);
+  return goSettermprop((int)prop, b, n, s, sl, (uintptr_t)user);
 }
-static int c_bell(void *user) { return goBell(user); }
+static int c_bell(void *user) { return goBell((uintptr_t)user); }
 
 static int c_sb_push(int cols, const VTermScreenCell *cells, void *user) {
   if (cols <= 0 || cells == NULL) return 1;
@@ -104,16 +111,16 @@ static int c_sb_push(int cols, const VTermScreenCell *cells, void *user) {
     if (cells[i].attrs.italic) attrs[i] |= 4;
     if (cells[i].attrs.reverse) attrs[i] |= 16;
   }
-  int r = goSBPushCells(cols, chars, fg, bg, attrs, user);
+  int r = goSBPushCells(cols, chars, fg, bg, attrs, (uintptr_t)user);
   free(chars); free(fg); free(bg); free(attrs);
   return r;
 }
 static int c_sb_pop(int cols, VTermScreenCell *cells, void *user) {
   (void)cells;
-  return goSBPop(cols, user);
+  return goSBPop(cols, (uintptr_t)user);
 }
-static int c_sb_clear(void *user) { return goSBClear(user); }
-static void c_output(const char *s, size_t len, void *user) { goOutput(s, len, user); }
+static int c_sb_clear(void *user) { return goSBClear((uintptr_t)user); }
+static void c_output(const char *s, size_t len, void *user) { goOutput(s, len, (uintptr_t)user); }
 
 static VTermScreenCallbacks screen_cbs = {
   .damage = c_damage,
@@ -125,13 +132,14 @@ static VTermScreenCallbacks screen_cbs = {
   .sb_clear = c_sb_clear,
 };
 
-static void setup_screen(VTerm *vt, void *user) {
+static void setup_screen(VTerm *vt, uintptr_t user) {
+  void *voiduser = (void *)user;
   VTermScreen *screen = vterm_obtain_screen(vt);
-  vterm_screen_set_callbacks(screen, &screen_cbs, user);
+  vterm_screen_set_callbacks(screen, &screen_cbs, voiduser);
   vterm_screen_set_damage_merge(screen, VTERM_DAMAGE_ROW);
   vterm_screen_enable_altscreen(screen, 1);
   vterm_screen_reset(screen, 1);
-  vterm_output_set_callback(vt, c_output, user);
+  vterm_output_set_callback(vt, c_output, voiduser);
   vterm_set_utf8(vt, 1);
 }
 
@@ -187,8 +195,17 @@ var (
 
 // Term wraps a libvterm instance with dirty tracking and scrollback.
 type Term struct {
-	vt         *C.VTerm
-	screen     *C.VTermScreen
+	vt     *C.VTerm
+	screen *C.VTermScreen
+	// vtMu serializes every call into libvterm against Close's vterm_free.
+	// Write/Resize/Close/collectOutput used to capture vt/screen under mu,
+	// unlock, then pass the pointer to C — so a concurrent Close could free
+	// it in that window and hand the next libvterm call a dangling pointer
+	// (observed as a SIGSEGV inside vterm_set_size under rapid resize).
+	// Callbacks (goDamage etc.) only ever take mu, never vtMu, so holding
+	// vtMu across a libvterm call — which synchronously re-enters Go via
+	// those callbacks — can't deadlock.
+	vtMu       sync.Mutex
 	handle     cgo.Handle
 	rows       int
 	cols       int
@@ -238,7 +255,7 @@ func New(rows, cols, scrollback int) *Term {
 	registryMu.Lock()
 	registry[t.handle] = t
 	registryMu.Unlock()
-	C.setup_screen(t.vt, unsafe.Pointer(t.handle))
+	C.setup_screen(t.vt, C.uintptr_t(t.handle))
 	C.set_defaults(t.vt,
 		C.uint8_t(t.defFG.R), C.uint8_t(t.defFG.G), C.uint8_t(t.defFG.B),
 		C.uint8_t(t.defBG.R), C.uint8_t(t.defBG.G), C.uint8_t(t.defBG.B),
@@ -246,8 +263,8 @@ func New(rows, cols, scrollback int) *Term {
 	return t
 }
 
-func lookup(user unsafe.Pointer) *Term {
-	h := cgo.Handle(user)
+func lookup(user C.uintptr_t) *Term {
+	h := cgo.Handle(uintptr(user))
 	registryMu.RLock()
 	t := registry[h]
 	registryMu.RUnlock()
@@ -255,15 +272,18 @@ func lookup(user unsafe.Pointer) *Term {
 }
 
 func (t *Term) Close() {
-	t.mu.Lock()
+	t.vtMu.Lock()
 	vt := t.vt
 	t.vt = nil
 	t.screen = nil
-	h := t.handle
-	t.mu.Unlock()
 	if vt != nil {
 		C.vterm_free(vt)
 	}
+	t.vtMu.Unlock()
+
+	t.mu.Lock()
+	h := t.handle
+	t.mu.Unlock()
 	registryMu.Lock()
 	delete(registry, h)
 	registryMu.Unlock()
@@ -284,16 +304,18 @@ func (t *Term) Write(p []byte) {
 	if len(p) == 0 {
 		return
 	}
-	t.mu.Lock()
+	t.vtMu.Lock()
+	defer t.vtMu.Unlock()
 	vt, screen := t.vt, t.screen
+	if vt == nil {
+		return
+	}
+	t.mu.Lock()
 	if t.scrollOff != 0 {
 		t.scrollOff = 0 // new output jumps to bottom
 		t.full = true
 	}
 	t.mu.Unlock()
-	if vt == nil {
-		return
-	}
 	C.vterm_input_write(vt, (*C.char)(unsafe.Pointer(&p[0])), C.size_t(len(p)))
 	C.vterm_screen_flush_damage(screen)
 	t.mu.Lock()
@@ -302,12 +324,16 @@ func (t *Term) Write(p []byte) {
 }
 
 func (t *Term) Resize(rows, cols int) {
-	t.mu.Lock()
-	vt := t.vt
-	if rows < 1 || cols < 1 || vt == nil {
-		t.mu.Unlock()
+	if rows < 1 || cols < 1 {
 		return
 	}
+	t.vtMu.Lock()
+	defer t.vtMu.Unlock()
+	vt := t.vt
+	if vt == nil {
+		return
+	}
+	t.mu.Lock()
 	t.rows, t.cols = rows, cols
 	t.full = true
 	t.scrollOff = 0
@@ -537,42 +563,44 @@ func (t *Term) ScrollBy(delta int) {
 }
 
 func (t *Term) KeyboardUnichar(r rune, mod int) []byte {
-	return t.collectOutput(func() {
-		C.vterm_keyboard_unichar(t.vt, C.uint32_t(r), C.VTermModifier(mod))
+	return t.collectOutput(func(vt *C.VTerm) {
+		C.vterm_keyboard_unichar(vt, C.uint32_t(r), C.VTermModifier(mod))
 	})
 }
 
 func (t *Term) KeyboardKey(key int, mod int) []byte {
-	return t.collectOutput(func() {
-		C.vterm_keyboard_key(t.vt, C.VTermKey(key), C.VTermModifier(mod))
+	return t.collectOutput(func(vt *C.VTerm) {
+		C.vterm_keyboard_key(vt, C.VTermKey(key), C.VTermModifier(mod))
 	})
 }
 
 // MouseButton sends a mouse button via libvterm (row/col 0-based).
 func (t *Term) MouseButton(button int, pressed bool, row, col, mod int) []byte {
-	return t.collectOutput(func() {
-		C.vterm_mouse_move(t.vt, C.int(row), C.int(col), C.VTermModifier(mod))
-		C.vterm_mouse_button(t.vt, C.int(button), C.bool(pressed), C.VTermModifier(mod))
+	return t.collectOutput(func(vt *C.VTerm) {
+		C.vterm_mouse_move(vt, C.int(row), C.int(col), C.VTermModifier(mod))
+		C.vterm_mouse_button(vt, C.int(button), C.bool(pressed), C.VTermModifier(mod))
 	})
 }
 
 func (t *Term) MouseMove(row, col, mod int) []byte {
-	return t.collectOutput(func() {
-		C.vterm_mouse_move(t.vt, C.int(row), C.int(col), C.VTermModifier(mod))
+	return t.collectOutput(func(vt *C.VTerm) {
+		C.vterm_mouse_move(vt, C.int(row), C.int(col), C.VTermModifier(mod))
 	})
 }
 
-func (t *Term) collectOutput(fn func()) []byte {
+func (t *Term) collectOutput(fn func(vt *C.VTerm)) []byte {
+	t.vtMu.Lock()
+	defer t.vtMu.Unlock()
+	vt := t.vt
+	if vt == nil {
+		return nil
+	}
 	t.mu.Lock()
 	var buf []byte
 	prev := t.onOutput
 	t.onOutput = func(b []byte) { buf = append(buf, b...) }
-	vt := t.vt
 	t.mu.Unlock()
-	if vt == nil {
-		return nil
-	}
-	fn()
+	fn(vt)
 	t.mu.Lock()
 	t.onOutput = prev
 	t.mu.Unlock()

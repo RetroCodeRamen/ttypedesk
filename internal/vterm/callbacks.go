@@ -12,7 +12,7 @@ import (
 )
 
 //export goDamage
-func goDamage(startRow, endRow, startCol, endCol C.int, user unsafe.Pointer) C.int {
+func goDamage(startRow, endRow, startCol, endCol C.int, user C.uintptr_t) C.int {
 	_ = startCol
 	_ = endCol
 	t := lookup(user)
@@ -28,7 +28,7 @@ func goDamage(startRow, endRow, startCol, endCol C.int, user unsafe.Pointer) C.i
 }
 
 //export goMovecursor
-func goMovecursor(row, col, oldrow, oldcol, visible C.int, user unsafe.Pointer) C.int {
+func goMovecursor(row, col, oldrow, oldcol, visible C.int, user C.uintptr_t) C.int {
 	_ = oldrow
 	_ = oldcol
 	t := lookup(user)
@@ -44,7 +44,7 @@ func goMovecursor(row, col, oldrow, oldcol, visible C.int, user unsafe.Pointer) 
 }
 
 //export goSettermprop
-func goSettermprop(prop, boolVal, numberVal C.int, str *C.char, strLen C.int, user unsafe.Pointer) C.int {
+func goSettermprop(prop, boolVal, numberVal C.int, str *C.char, strLen C.int, user C.uintptr_t) C.int {
 	t := lookup(user)
 	if t == nil {
 		return 0
@@ -70,7 +70,7 @@ func goSettermprop(prop, boolVal, numberVal C.int, str *C.char, strLen C.int, us
 }
 
 //export goBell
-func goBell(user unsafe.Pointer) C.int {
+func goBell(user C.uintptr_t) C.int {
 	t := lookup(user)
 	if t != nil {
 		t.mu.Lock()
@@ -81,7 +81,7 @@ func goBell(user unsafe.Pointer) C.int {
 }
 
 //export goSBPushCells
-func goSBPushCells(cols C.int, chars *C.uint32_t, fg, bg, attrs *C.uint8_t, user unsafe.Pointer) C.int {
+func goSBPushCells(cols C.int, chars *C.uint32_t, fg, bg, attrs *C.uint8_t, user C.uintptr_t) C.int {
 	t := lookup(user)
 	if t == nil || t.scrollMax == 0 {
 		return 1
@@ -124,7 +124,7 @@ func goSBPushCells(cols C.int, chars *C.uint32_t, fg, bg, attrs *C.uint8_t, user
 }
 
 //export goSBPop
-func goSBPop(cols C.int, user unsafe.Pointer) C.int {
+func goSBPop(cols C.int, user C.uintptr_t) C.int {
 	_ = cols
 	t := lookup(user)
 	if t == nil {
@@ -140,7 +140,7 @@ func goSBPop(cols C.int, user unsafe.Pointer) C.int {
 }
 
 //export goSBClear
-func goSBClear(user unsafe.Pointer) C.int {
+func goSBClear(user C.uintptr_t) C.int {
 	t := lookup(user)
 	if t == nil {
 		return 1
@@ -153,7 +153,7 @@ func goSBClear(user unsafe.Pointer) C.int {
 }
 
 //export goOutput
-func goOutput(s *C.char, length C.size_t, user unsafe.Pointer) {
+func goOutput(s *C.char, length C.size_t, user C.uintptr_t) {
 	t := lookup(user)
 	if t == nil || s == nil || length == 0 {
 		return

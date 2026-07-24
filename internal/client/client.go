@@ -34,6 +34,7 @@ type BootOptions struct {
 // Client renders the DOS-era desktop and dispatches input.
 type Client struct {
 	screen tcell.Screen
+	tty    *deadlineTty
 	srv    *server.Server
 	cfg    config.Config
 	boot   BootOptions
@@ -121,7 +122,11 @@ type winCache struct {
 }
 
 func New(srv *server.Server, cfg config.Config, boot BootOptions) (*Client, error) {
-	s, err := tcell.NewScreen()
+	tty, err := newDeadlineTty()
+	if err != nil {
+		return nil, err
+	}
+	s, err := tcell.NewTerminfoScreenFromTty(tty)
 	if err != nil {
 		return nil, err
 	}
@@ -132,6 +137,7 @@ func New(srv *server.Server, cfg config.Config, boot BootOptions) (*Client, erro
 	s.EnablePaste()
 	c := &Client{
 		screen:      s,
+		tty:         tty,
 		srv:         srv,
 		cfg:         cfg,
 		boot:        boot,
@@ -310,6 +316,13 @@ func (c *Client) Run() error {
 				c.pollCalendarReminders()
 				c.pollConfigReload()
 				c.draw()
+				if c.tty.ConsumeTimedOut() {
+					// A write got torn by the deadline: the terminal may
+					// have a partial escape sequence sitting in it, and
+					// tcell's diff model no longer matches what's really
+					// on screen. Force a full repaint to self-heal.
+					c.screen.Sync()
+				}
 				if c.cfg.RestoreSession && time.Since(lastSave) >= 30*time.Second {
 					c.saveSession()
 					lastSave = time.Now()
@@ -362,11 +375,16 @@ func (c *Client) handleEvent(ev tcell.Event) {
 		w, h := e.Size()
 		c.srv.SetHostSize(w, h)
 		c.layoutDirty = true
-		c.screen.Sync()
 	case *tcell.EventKey:
 		c.handleKey(e)
 	case *tcell.EventMouse:
 		c.handleMouse(e)
+	case *tcell.EventError:
+		// The tty read loop only surfaces this once the underlying pty is
+		// truly gone (e.g. the SSH session was torn down). Quit cleanly
+		// instead of spinning forever on doomed writes to a dead fd.
+		slog.Warn("tty error, shutting down: %v", e.Error())
+		c.quit = true
 	}
 }
 

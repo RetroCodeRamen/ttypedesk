@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"runtime/debug"
 	"strings"
+	"syscall"
 
 	"github.com/ttypedesk/ttypedesk/internal/attach"
 	"github.com/ttypedesk/ttypedesk/internal/client"
@@ -16,6 +18,21 @@ import (
 )
 
 func main() {
+	// A stalled/dropped SSH link can make sshd tear down the session and send
+	// SIGHUP to the foreground process group. The OS default disposition is
+	// to terminate immediately, skipping every defer (session save, terminal
+	// reset) and leaving the remote pty in raw/alt-screen mode. Ignore it and
+	// let the tty read/write paths (bounded by deadlineTty, surfaced as
+	// *tcell.EventError) drive a clean shutdown instead.
+	signal.Ignore(syscall.SIGHUP)
+	// clip.Set writes OSC 52 straight to os.Stdout (fd 1). Go specially
+	// crashes the whole process on SIGPIPE for writes to fd 1/2 unless told
+	// otherwise, so a clipboard sync over a dead link would kill ttypedesk
+	// outright with no panic, no log line — indistinguishable from the
+	// SIGHUP case above. Ignoring SIGPIPE makes those writes fail with a
+	// normal (discarded) EPIPE error instead.
+	signal.Ignore(syscall.SIGPIPE)
+
 	listen := flag.String("listen", "", "Unix socket for remote attach (e.g. /tmp/ttypedesk.sock)")
 	attachPath := flag.String("attach", "", "attach to an existing TTYPE Desk socket (read-only)")
 	execCmd := flag.String("e", "", "command to run in initial terminal (instead of $SHELL)")
