@@ -76,9 +76,20 @@ default; any source you add by hand gets the warning once.
 - `install.script` — path to a shell script relative to the repo root,
   fetched over `raw.githubusercontent.com` and run as-is.
 - `register` — one or more Start-menu launchers to add once detected;
-  matched against existing `cfg.Programs` by ID first, then by name, so
-  repeat installs (or an app that was already present) don't duplicate
-  entries.
+  matched against existing `cfg.Programs` by ID, so repeat installs (or a
+  re-detect on a later App Store open) update the existing entry in place
+  instead of duplicating it. A brand new entry never takes over some other
+  existing program just because they share a display Name — if `name` is
+  already in use by an unrelated program, it's suffixed `-store` (then
+  `-store-2`, …) so both coexist in the Start menu.
+
+## Naming vs. upstream
+
+`name` is whatever should show in TTYPE Desk's Start menu — it doesn't have
+to match the upstream project's name. E.g. an entry for a system monitor
+whose upstream project is called `btop` can register as `"name": "Task
+Manager"` with `"menu": "system"`; the App Store still detects/installs the
+real `btop` binary under the hood.
 
 ## Config (`app_sources`)
 
