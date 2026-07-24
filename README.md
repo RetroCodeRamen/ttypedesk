@@ -20,6 +20,22 @@ Somewhere around the fourth time I alt-tabbed between six `tmux` panes and thoug
 
 libvterm **0.3.3** is vendored under `third_party/libvterm-0.3.3` (no system package required — one less thing to go wrong on someone else's machine).
 
+## Install (one-liner)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RetroCodeRamen/ttypedesk/master/install.sh | bash
+```
+
+Linux only. Installs build deps (`apt`/`dnf`/`pacman`/`zypper`/`apk`, best-effort
+outside Debian/Ubuntu, prompting for `sudo` right there in your terminal if it's
+needed — nothing is ever stored), bootstraps a per-user Go toolchain if yours is
+too old, clones the repo, builds it, and drops `ttypedesk` in `~/.local/bin`.
+
+**Not fully tested yet** — it's fresh off the workbench and hasn't been run
+against a truly clean machine. If it eats your terminal, you get to keep both
+pieces. Cloning manually and running `./build.sh` (below) is the tested path
+until this gets a few more real runs under it.
+
 ## Build
 
 ```bash
