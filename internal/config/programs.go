@@ -50,7 +50,7 @@ func (c Config) UsedIcons() map[string]struct{} {
 
 // BuiltinProgramIcons are reserved by first-party Start menu entries.
 func BuiltinProgramIcons() []string {
-	return []string{"📝", "📅", "🕐", "🖼", "💻", "📁", "⚙️", "⏻", "➕", "🗑"}
+	return []string{"📝", "📅", "🕐", "🖼", "💻", "📁", "⚙️", "⏻", "➕", "🗑", "🛍"}
 }
 
 // IconPalette is the selectable emoji pool for Add Program.

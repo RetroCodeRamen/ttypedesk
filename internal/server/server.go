@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ttypedesk/ttypedesk/apps/addprog"
+	"github.com/ttypedesk/ttypedesk/apps/appstore"
 	"github.com/ttypedesk/ttypedesk/apps/calendar"
 	"github.com/ttypedesk/ttypedesk/apps/clock"
 	"github.com/ttypedesk/ttypedesk/apps/files"
@@ -256,6 +257,8 @@ func (s *Server) launchAction(action string) error {
 	case "mgrprog", "manage-programs", "removeprog":
 		_, err := s.CreateApp("mgrprog", "Manage Programs")
 		return err
+	case "appstore", "app-store", "store":
+		return s.FocusOrCreateApp("appstore", "App Store")
 	default:
 		if len(action) > 5 && action[:5] == "open:" {
 			return s.OpenPath(action[5:])
@@ -582,6 +585,18 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 				}
 			}), cc, cr)
 			title = "Manage Programs"
+		case "appstore":
+			cfgSnap := s.cfg
+			w, h = 60, 18
+			cc, cr = w-2, h-2
+			surf, err = surface.NewAppSurface(id, "App Store", appstore.New(cfgSnap, func(nc config.Config) {
+				_ = config.Save(nc)
+				s.SetConfig(nc)
+				if s.onConfig != nil {
+					s.onConfig(nc)
+				}
+			}), cc, cr)
+			title = "App Store"
 		case "imageview":
 			app := imageview.NewDemo()
 			if path != "" {
@@ -1066,7 +1081,7 @@ func (s *Server) CaptureSession() session.State {
 		}
 		// Skip transient setup dialogs
 		switch w.Launch {
-		case "addprog", "mgrprog":
+		case "addprog", "mgrprog", "appstore":
 			continue
 		}
 		x, y, ww, hh := w.X, w.Y, w.W, w.H

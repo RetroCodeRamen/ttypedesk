@@ -34,6 +34,7 @@ func (c *Client) buildStartMenu() {
 		{Label: "Settings", Icon: "⚙️", Do: launch("settings")},
 		{Label: "Manual", Icon: "📖", Do: launch("manual")},
 		{Label: "System folder", Icon: "📂", Do: launch("files:system")},
+		{Label: "App Store", Icon: "🛍", Do: launch("appstore")},
 		{Label: "Add Program…", Icon: "➕", Do: launch("addprog")},
 		{Label: "Manage Programs…", Icon: "🗑", Do: launch("mgrprog")},
 	}

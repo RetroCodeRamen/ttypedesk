@@ -106,6 +106,12 @@ type PaletteCfg struct {
 	ASCIIIcons       bool `json:"ascii_icons"`          // draw ASCII substitutes for emoji icons
 }
 
+// AppSource is a catalog repo the App Store fetches index.json from.
+type AppSource struct {
+	Repo   string `json:"repo"`             // "owner/repo"
+	Branch string `json:"branch,omitempty"` // defaults to "main" if empty
+}
+
 // MinScrollback is the smallest scrollback depth (in lines) any terminal
 // window is allowed to have, regardless of what a user config requests.
 const MinScrollback = 1000
@@ -133,6 +139,7 @@ type Config struct {
 	Hotkeys             map[string]string `json:"hotkeys"`
 	Palette             PaletteCfg        `json:"palette"`
 	Recipes             []Recipe          `json:"recipes"`
+	AppSources          []AppSource       `json:"app_sources"`
 }
 
 // TaskbarDock returns normalized dock side.
@@ -200,6 +207,9 @@ func Default() Config {
 		Recipes: []Recipe{
 			{Match: "wifi connect", Action: "pty:nmtui"},
 			{Match: "install doom", Action: "pty:bash -lc sudo apt install chocolate-doom", Confirm: true},
+		},
+		AppSources: []AppSource{
+			{Repo: "RetroCodeRamen/ttypedesk-apps", Branch: "main"},
 		},
 	}
 }
