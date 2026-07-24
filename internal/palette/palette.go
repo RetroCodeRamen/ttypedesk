@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"unicode"
+
+	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
 )
 
 // Hit is one ranked result in the command palette.
@@ -61,6 +63,7 @@ type Env struct {
 	Programs   []Program
 	Recipes    []Recipe
 	History    []string // recent queries, newest first
+	AsciiIcons bool      // draw ASCII substitutes instead of emoji
 }
 
 // Search returns ranked hits for the current query.
@@ -74,7 +77,7 @@ func Search(env Env) []Hit {
 	if q == "" {
 		hits = append(hits, historyHits(env)...)
 		hits = append(hits, catalogHits(env, "")...)
-		return trim(hits, max)
+		return applyIconMode(trim(hits, max), env.AsciiIcons)
 	}
 	low := strings.ToLower(q)
 	verb, rest := splitVerb(low)
@@ -112,7 +115,18 @@ func Search(env Env) []Hit {
 		hits = append(hits, findHits(env, q)...)
 	}
 
-	return trim(dedupe(hits), max)
+	return applyIconMode(trim(dedupe(hits), max), env.AsciiIcons)
+}
+
+// applyIconMode substitutes ASCII stand-ins for emoji icons when ascii is set.
+func applyIconMode(hits []Hit, ascii bool) []Hit {
+	if !ascii {
+		return hits
+	}
+	for i := range hits {
+		hits[i].Icon = uwidth.ASCIIIcon(hits[i].Icon, ascii)
+	}
+	return hits
 }
 
 func splitVerb(q string) (verb, rest string) {

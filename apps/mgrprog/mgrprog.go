@@ -187,6 +187,7 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 			if icon == "" {
 				icon = "🚀"
 			}
+			icon = uwidth.ASCIIIcon(icon, a.cfg.Palette.ASCIIIcons)
 			line := fmt.Sprintf("%s %s  [%s]  %s", icon, p.Name, folder, p.Command)
 			cv.DrawText(1, y, uwidth.Truncate(line, cols-2), f, b, 0)
 		}

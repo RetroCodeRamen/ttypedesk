@@ -75,13 +75,14 @@ func (c *Client) paletteEnv() palette.Env {
 		max = 12
 	}
 	return palette.Env{
-		Query:    c.paletteQuery,
-		Max:      max,
-		Windows:  pw,
-		Icons:    icons,
-		Programs: progs,
-		Recipes:  recipes,
-		History:  c.paletteHist,
+		Query:      c.paletteQuery,
+		Max:        max,
+		Windows:    pw,
+		Icons:      icons,
+		Programs:   progs,
+		Recipes:    recipes,
+		History:    c.paletteHist,
+		AsciiIcons: c.cfg.Palette.ASCIIIcons,
 		Launch: func(action string) error {
 			return c.srv.LaunchAction(action)
 		},

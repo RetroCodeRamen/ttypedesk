@@ -354,9 +354,10 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 			if icon == "" {
 				icon = "📦"
 			}
+			icon = uwidth.ASCIIIcon(icon, a.cfg.Palette.ASCIIIcons)
 			line := fmt.Sprintf("%s %-20s [%s]", icon, r.entry.Name, statusLabel(r.state))
 			if !r.src.Trusted && r.state != statusInstalled {
-				line += "  ⚠ unverified source"
+				line += "  " + uwidth.ASCIIIcon("⚠", a.cfg.Palette.ASCIIIcons) + " unverified source"
 			}
 			cv.DrawText(1, y, uwidth.Truncate(line, cols-2), f, b, 0)
 		}
@@ -367,7 +368,7 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 		r := a.rows[a.sel]
 		switch {
 		case a.confirmIdx == a.sel:
-			help = "⚠ " + r.src.Repo + " isn't trusted — install script runs unsandboxed, may use sudo. Enter again to trust & install, Esc to cancel."
+			help = uwidth.ASCIIIcon("⚠", a.cfg.Palette.ASCIIIcons) + " " + r.src.Repo + " isn't trusted — install script runs unsandboxed, may use sudo. Enter again to trust & install, Esc to cancel."
 		case r.state == statusInstalling:
 			help = r.entry.Name + ": installing — see the new terminal window"
 		case r.state == statusInstalled:

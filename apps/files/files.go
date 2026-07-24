@@ -785,7 +785,7 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 		return a.drawSettings(cv, cols, rows, fg, bg, hdr, hi)
 	}
 
-	title := " 📁 " + a.dir
+	title := " " + uwidth.ASCIIIcon("📁", a.cfg.Palette.ASCIIIcons) + " " + a.dir
 	cv.DrawText(0, 0, uwidth.Truncate(title, cols), cell.RGB(0xFF, 0xFF, 0xFF), hdr, cell.AttrBold)
 	tb := " Up  Home  Refr  View  Set  New  Wall  Desk "
 	cv.DrawText(0, 1, uwidth.Truncate(tb, cols), fg, cell.RGB(0xA0, 0xA0, 0xA0), 0)
@@ -836,6 +836,7 @@ func (a *App) drawList(cv *uiapp.Canvas, cols, listTop, listH int, fg, bg, hi ce
 		if ent.isDir {
 			icon = "📁"
 		}
+		icon = uwidth.ASCIIIcon(icon, a.cfg.Palette.ASCIIIcons)
 		label := icon + " " + ent.name
 		f, b := fg, bg
 		if i == a.sel {
@@ -874,6 +875,7 @@ func (a *App) drawGrid(cv *uiapp.Canvas, cols, listTop, listH int, fg, bg, hi ce
 					icon = "🖼"
 				}
 			}
+			icon = uwidth.ASCIIIcon(icon, a.cfg.Palette.ASCIIIcons)
 			f, b := fg, bg
 			if i == a.sel {
 				f, b = cell.RGB(0xFF, 0xFF, 0xFF), hi

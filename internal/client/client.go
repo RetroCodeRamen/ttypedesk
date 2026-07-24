@@ -1101,7 +1101,7 @@ func (c *Client) trayLayout() trayGeom {
 }
 
 func (c *Client) trayBellLabel() string {
-	bellGlyph := "🔔"
+	bellGlyph := c.iconGlyph("🔔")
 	unread := 0
 	if c.notify != nil {
 		unread = c.notify.Unread()
@@ -1275,6 +1275,12 @@ func (c *Client) drawString(x, y int, s string, fg, bg cell.Color, attr cell.Att
 		}
 		col += w
 	}
+}
+
+// iconGlyph returns icon, substituted for an ASCII stand-in when the
+// "disable emoji" setting is on.
+func (c *Client) iconGlyph(icon string) string {
+	return uwidth.ASCIIIcon(icon, c.cfg.Palette.ASCIIIcons)
 }
 
 func (c *Client) drawDesktopIcons() {
@@ -1600,7 +1606,7 @@ func (c *Client) drawBanner() {
 	}
 	title := c.banner.Title
 	if c.banner.Icon != "" {
-		title = c.banner.Icon + " " + title
+		title = c.iconGlyph(c.banner.Icon) + " " + title
 	}
 	c.drawString(bx+1, by, uwidth.Truncate(title, bw-2), th.TitleFG, hdr, cell.AttrBold)
 	c.drawString(bx+1, by+1, uwidth.Truncate(c.banner.Body, bw-2), fg, bg, 0)
@@ -1633,7 +1639,7 @@ func (c *Client) drawNotifyCenter() {
 			}
 			line := n.Title
 			if n.Icon != "" {
-				line = n.Icon + " " + line
+				line = c.iconGlyph(n.Icon) + " " + line
 			}
 			if n.Body != "" {
 				line += " — " + n.Body

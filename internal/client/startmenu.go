@@ -23,20 +23,20 @@ func (c *Client) buildStartMenu() {
 		}
 	}
 	programs := []startMenuItem{
-		{Label: "Notes", Icon: "📝", Do: launch("notes")},
-		{Label: "Calendar", Icon: "📅", Do: launch("calendar")},
-		{Label: "Clock", Icon: "🕐", Do: launch("clock")},
-		{Label: "Image Viewer", Icon: "🖼", Do: launch("image")},
+		{Label: "Notes", Icon: c.iconGlyph("📝"), Do: launch("notes")},
+		{Label: "Calendar", Icon: c.iconGlyph("📅"), Do: launch("calendar")},
+		{Label: "Clock", Icon: c.iconGlyph("🕐"), Do: launch("clock")},
+		{Label: "Image Viewer", Icon: c.iconGlyph("🖼"), Do: launch("image")},
 	}
 	system := []startMenuItem{
-		{Label: "Terminal", Icon: "💻", Do: launch("terminal")},
-		{Label: "Files", Icon: "📁", Do: launch("files")},
-		{Label: "Settings", Icon: "⚙️", Do: launch("settings")},
-		{Label: "Manual", Icon: "📖", Do: launch("manual")},
-		{Label: "System folder", Icon: "📂", Do: launch("files:system")},
-		{Label: "App Store", Icon: "🛍", Do: launch("appstore")},
-		{Label: "Add Program…", Icon: "➕", Do: launch("addprog")},
-		{Label: "Manage Programs…", Icon: "🗑", Do: launch("mgrprog")},
+		{Label: "Terminal", Icon: c.iconGlyph("💻"), Do: launch("terminal")},
+		{Label: "Files", Icon: c.iconGlyph("📁"), Do: launch("files")},
+		{Label: "Settings", Icon: c.iconGlyph("⚙️"), Do: launch("settings")},
+		{Label: "Manual", Icon: c.iconGlyph("📖"), Do: launch("manual")},
+		{Label: "System folder", Icon: c.iconGlyph("📂"), Do: launch("files:system")},
+		{Label: "App Store", Icon: c.iconGlyph("🛍"), Do: launch("appstore")},
+		{Label: "Add Program…", Icon: c.iconGlyph("➕"), Do: launch("addprog")},
+		{Label: "Manage Programs…", Icon: c.iconGlyph("🗑"), Do: launch("mgrprog")},
 	}
 	for _, p := range c.cfg.Programs {
 		p := p
@@ -46,7 +46,7 @@ func (c *Client) buildStartMenu() {
 		}
 		item := startMenuItem{
 			Label: p.Name,
-			Icon:  icon,
+			Icon:  c.iconGlyph(icon),
 			Do:    launch(config.ProgramAction(p.ID)),
 		}
 		if p.MenuFolder() == config.MenuSystem {

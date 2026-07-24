@@ -417,7 +417,7 @@ func (a *App) activate() {
 		case a.sel == len(actions)+1:
 			a.cfg.Palette.ASCIIIcons = !a.cfg.Palette.ASCIIIcons
 			a.persist()
-			a.status = fmt.Sprintf("ASCII icon substitutes: %v", a.cfg.Palette.ASCIIIcons)
+			a.status = fmt.Sprintf("Disable emoji: %v", a.cfg.Palette.ASCIIIcons)
 		case a.sel == len(actions)+2:
 			a.cfg.Hotkeys = config.DefaultHotkeys()
 			a.persist()
@@ -728,7 +728,7 @@ func (a *App) lines() []string {
 		}
 		out = append(out,
 			fmt.Sprintf("Start opens command palette: %s", on[a.cfg.Palette.StartOpensPalette]),
-			fmt.Sprintf("ASCII icon substitutes: %s", on[a.cfg.Palette.ASCIIIcons]),
+			fmt.Sprintf("Disable emoji (ASCII substitutes): %s", on[a.cfg.Palette.ASCIIIcons]),
 			"Reset hotkeys to defaults",
 		)
 		return out
