@@ -107,6 +107,58 @@ func TestRegisterEntryByIDNoopWhenUnchanged(t *testing.T) {
 	}
 }
 
+func TestRegisterEntrySetsRoleOnNewProgram(t *testing.T) {
+	cfg := &config.Config{}
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-superfile", Name: "SuperFile", Command: "pty:spf", SetRole: "filemgr"},
+	}}
+
+	registerEntry(cfg, e)
+
+	if cfg.Roles.FileMgr != "prog:appstore-superfile" {
+		t.Fatalf("Roles.FileMgr = %q, want %q", cfg.Roles.FileMgr, "prog:appstore-superfile")
+	}
+}
+
+func TestRegisterEntrySetsRoleOnIDMatchedUpdate(t *testing.T) {
+	cfg := &config.Config{Programs: []config.Program{
+		{ID: "appstore-superfile", Name: "SuperFile", Command: "pty:spf"},
+	}}
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-superfile", Name: "SuperFile", Command: "pty:spf", SetRole: "filemgr"},
+	}}
+
+	changed := registerEntry(cfg, e)
+
+	if !changed {
+		t.Fatal("registerEntry() = false, want true (role changed)")
+	}
+	if cfg.Roles.FileMgr != "prog:appstore-superfile" {
+		t.Fatalf("Roles.FileMgr = %q, want %q", cfg.Roles.FileMgr, "prog:appstore-superfile")
+	}
+}
+
+func TestRegisterEntryWithoutSetRoleLeavesRolesAlone(t *testing.T) {
+	cfg := &config.Config{}
+	cfg.Roles.FileMgr = "files"
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-gotube", Name: "GoTube", Command: "pty:gophertube"},
+	}}
+
+	registerEntry(cfg, e)
+
+	if cfg.Roles.FileMgr != "files" {
+		t.Fatalf("Roles.FileMgr = %q, want unchanged %q", cfg.Roles.FileMgr, "files")
+	}
+}
+
+func TestApplySetRoleUnknownRoleIsNoop(t *testing.T) {
+	cfg := &config.Config{}
+	if applySetRole(cfg, "bogus-role", "x") {
+		t.Fatal("applySetRole() = true for an unknown role, want false")
+	}
+}
+
 func TestUniqueProgramName(t *testing.T) {
 	cfg := &config.Config{Programs: []config.Program{
 		{Name: "Task Manager"},

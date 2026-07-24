@@ -22,6 +22,9 @@ func registerEntry(cfg *config.Config, e RemoteEntry) bool {
 				p.Command = w.Command
 				changed = true
 			}
+			if w.SetRole != "" && applySetRole(cfg, w.SetRole, w.ID) {
+				changed = true
+			}
 			continue
 		}
 		menu := config.MenuPrograms
@@ -36,12 +39,41 @@ func registerEntry(cfg *config.Config, e RemoteEntry) bool {
 			Menu:    menu,
 			Desktop: false,
 		})
+		if w.SetRole != "" {
+			applySetRole(cfg, w.SetRole, w.ID)
+		}
 		changed = true
 	}
 	if changed {
 		cfg.SyncProgramDesktop()
 	}
 	return changed
+}
+
+// applySetRole points cfg.Roles.<role> at progID's prog: launch action.
+// Reports whether it actually changed anything (unknown roles are no-ops).
+func applySetRole(cfg *config.Config, role, progID string) bool {
+	action := config.ProgramAction(progID)
+	var target *string
+	switch strings.ToLower(role) {
+	case "filemgr", "files":
+		target = &cfg.Roles.FileMgr
+	case "editor":
+		target = &cfg.Roles.Editor
+	case "browser":
+		target = &cfg.Roles.Browser
+	case "terminal":
+		target = &cfg.Roles.Terminal
+	case "image":
+		target = &cfg.Roles.Image
+	default:
+		return false
+	}
+	if *target == action {
+		return false
+	}
+	*target = action
+	return true
 }
 
 // uniqueProgramName returns name unchanged if no existing program already

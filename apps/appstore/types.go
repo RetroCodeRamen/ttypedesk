@@ -34,6 +34,11 @@ type RegisterEntry struct {
 	Command string `json:"command"`
 	Icon    string `json:"icon"`
 	Menu    string `json:"menu"`
+	// SetRole, if set (e.g. "filemgr"), also points cfg.Roles.<Role> at
+	// this program once registered — the desktop's default for that role
+	// (Start menu, desktop icons, "open this folder") switches to it
+	// instead of just adding an extra Programs entry.
+	SetRole string `json:"set_role,omitempty"`
 }
 
 // catalogIndex is the root shape of a source repo's index.json.

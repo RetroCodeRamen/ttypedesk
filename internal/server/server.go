@@ -249,7 +249,7 @@ func (s *Server) launchAction(action string) error {
 		_, err := s.CreateGfx("Image Viewer", "")
 		return err
 	case "files", "filemgr":
-		_, err := s.CreateApp("files", "Files")
+		_, err := s.openFileManager("")
 		return err
 	case "addprog", "add-program":
 		_, err := s.CreateApp("addprog", "Add Program")
@@ -276,7 +276,7 @@ func (s *Server) launchAction(action string) error {
 				_ = manual.EnsureSystemFolder()
 				p = manual.Dir()
 			}
-			_, err := s.CreateAppPath("files", "Files", p)
+			_, err := s.openFileManager(p)
 			return err
 		}
 		if len(action) > 6 && action[:6] == "image:" {
@@ -378,12 +378,42 @@ func (s *Server) CreatePtyCmdPinned(title, command string, args []string) (*Wind
 
 // CreateProgram opens a registered program with pinned title and prog: launch key.
 func (s *Server) CreateProgram(p config.Program) (*Window, error) {
+	return s.launchProgramWithArg(p, "")
+}
+
+// launchProgramWithArg is CreateProgram plus an optional trailing argument
+// (shell-quoted), used to hand a path to an external file manager.
+func (s *Server) launchProgramWithArg(p config.Program, extraArg string) (*Window, error) {
 	shell := s.cfg.Shell
 	name := p.Name
 	if name == "" {
 		name = p.Command
 	}
-	return s.createPty(config.ProgramAction(p.ID), name, shell, []string{"-c", p.Command}, true)
+	cmd := p.Command
+	if extraArg != "" {
+		cmd = cmd + " " + shellQuote(extraArg)
+	}
+	return s.createPty(config.ProgramAction(p.ID), name, shell, []string{"-c", cmd}, true)
+}
+
+// shellQuote wraps s in single quotes for safe embedding in a `sh -c` command line.
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+// openFileManager opens the desktop's configured file manager at path (or
+// its own default location if path is empty). Defaults to the built-in
+// Files app; if Roles.FileMgr has been pointed at an installed program
+// (e.g. by the App Store's set_role: "filemgr"), that program is launched
+// instead, with path appended as a trailing argument when non-empty.
+func (s *Server) openFileManager(path string) (*Window, error) {
+	role := s.Config().ResolveRole("filemgr")
+	if strings.HasPrefix(role, "prog:") {
+		if p := s.Config().FindProgram(role[5:]); p != nil {
+			return s.launchProgramWithArg(*p, path)
+		}
+	}
+	return s.CreateAppPath("files", "Files", path)
 }
 
 func (s *Server) createPty(launch, title, command string, args []string, pinTitle bool) (*Window, error) {

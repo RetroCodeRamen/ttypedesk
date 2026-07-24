@@ -384,6 +384,70 @@ func TestNear(t *testing.T) {
 	}
 }
 
+func TestOpenFileManagerDefaultsToBuiltinFiles(t *testing.T) {
+	s := newTestServer()
+	win, err := s.openFileManager("")
+	if err != nil {
+		t.Fatalf("openFileManager: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+	if win.Kind != "app" {
+		t.Fatalf("Kind = %q, want %q (built-in Files)", win.Kind, "app")
+	}
+}
+
+func TestOpenFileManagerFallsBackWhenRoleProgramMissing(t *testing.T) {
+	s := newTestServer()
+	cfg := s.Config()
+	cfg.Roles.FileMgr = "prog:does-not-exist"
+	s.SetConfig(cfg)
+
+	win, err := s.openFileManager("")
+	if err != nil {
+		t.Fatalf("openFileManager: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+	if win.Kind != "app" {
+		t.Fatalf("Kind = %q, want %q (fallback to built-in Files)", win.Kind, "app")
+	}
+}
+
+func TestOpenFileManagerUsesRoleProgram(t *testing.T) {
+	s := newTestServer()
+	cfg := s.Config()
+	cfg.Programs = append(cfg.Programs, config.Program{ID: "appstore-superfile", Name: "SuperFile", Command: "true"})
+	cfg.Roles.FileMgr = "prog:appstore-superfile"
+	s.SetConfig(cfg)
+
+	win, err := s.openFileManager(t.TempDir())
+	if err != nil {
+		t.Fatalf("openFileManager: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+	if win.Kind != "pty" {
+		t.Fatalf("Kind = %q, want %q (external program)", win.Kind, "pty")
+	}
+	if win.Launch != "prog:appstore-superfile" {
+		t.Fatalf("Launch = %q, want %q", win.Launch, "prog:appstore-superfile")
+	}
+}
+
+func TestLaunchActionFilesRoutesThroughFileManagerRole(t *testing.T) {
+	s := newTestServer()
+	cfg := s.Config()
+	cfg.Programs = append(cfg.Programs, config.Program{ID: "appstore-superfile", Name: "SuperFile", Command: "true"})
+	cfg.Roles.FileMgr = "prog:appstore-superfile"
+	s.SetConfig(cfg)
+
+	if err := s.LaunchAction("files"); err != nil {
+		t.Fatalf("LaunchAction(files): %v", err)
+	}
+	wins := s.Windows()
+	if len(wins) != 1 || wins[0].Launch != "prog:appstore-superfile" {
+		t.Fatalf("Windows() = %v, want a single prog:appstore-superfile window", ids(wins))
+	}
+}
+
 func ids(ws []*Window) []string {
 	out := make([]string, len(ws))
 	for i, w := range ws {

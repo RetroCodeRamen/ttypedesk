@@ -83,6 +83,17 @@ default; any source you add by hand gets the warning once.
   already in use by an unrelated program, it's suffixed `-store` (then
   `-store-2`, …) so both coexist in the Start menu.
 
+## Replacing a default app (`set_role`)
+
+A `register` entry can set `"set_role": "filemgr"` to point
+`cfg.Roles.FileMgr` at the newly-registered program, not just add it to
+Start ▸ Programs. Once set, Start ▸ Files, desktop icons, and "open this
+folder" all launch that program instead of the built-in Files app — a real
+swap, not an additional option. If the program takes a path argument, the
+folder being opened is appended to its command. Revert anytime via Settings
+→ Default apps. Valid roles: `filemgr`, `editor`, `browser`, `terminal`,
+`image` (mirrors `config.Roles`).
+
 ## Naming vs. upstream
 
 `name` is whatever should show in TTYPE Desk's Start menu — it doesn't have

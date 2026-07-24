@@ -170,7 +170,7 @@ func (a *App) onTimer() {
 				a.persist()
 			}
 			if a.ctx != nil {
-				a.ctx.Notify("App Store", a.rows[i].entry.Name+" installed — added to Start ▸ Programs", "🛍")
+				a.ctx.Notify("App Store", a.rows[i].entry.Name+" "+registrationNotice(a.rows[i].entry), "🛍")
 			}
 		}
 	}
@@ -294,6 +294,18 @@ func (a *App) activate() {
 			}
 		}
 	}()
+}
+
+// registrationNotice is the completion toast text — called out specially
+// when an entry's install swaps a desktop-wide role (e.g. default file
+// manager) rather than just adding a Start ▸ Programs entry.
+func registrationNotice(e RemoteEntry) string {
+	for _, w := range e.Register {
+		if strings.EqualFold(w.SetRole, "filemgr") {
+			return "installed — now your default file manager"
+		}
+	}
+	return "installed — added to Start ▸ Programs"
 }
 
 func statusLabel(s status) string {
