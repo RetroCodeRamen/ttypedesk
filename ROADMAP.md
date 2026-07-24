@@ -157,6 +157,15 @@ See [docs/gui-bridge.md](docs/gui-bridge.md).
 - [x] **Manual** app — Start → System → Manual (TOC + chapters, focus-or-reuse)
 - [x] **System folder** — `~/.config/ttypedesk/System/` markdown copy; Start → System → System folder
 
+## App Store
+
+Start ▸ App Store — install extra apps from configured GitHub catalogs (fetch `index.json`, run install script in a terminal, register launchers once detected). Design: [docs/appstore.md](docs/appstore.md)
+
+- [x] Catalog fetch from one or more `app_sources` repos
+- [x] Detect / install / auto-register flow with Start ▸ Programs
+- [x] Default catalog: [ttypedesk-apps](https://github.com/RetroCodeRamen/ttypedesk-apps)
+- [ ] Per-source trust/warning UI (scripts run unsandboxed)
+
 ## Apps & platform
 
 - [ ] Out-of-process App SDK (stdio / Unix socket NDJSON)

@@ -69,6 +69,7 @@ Yes, it's in the corner. Yes, clicking it does what you think. We know exactly w
 
 - **Programs ▶** — Notes, Calendar, Clock, Image Viewer, plus user apps with menu=`programs`
 - **System ▶** — Terminal, Files, Settings, **Manual**, **System folder**, **Add Program…**, **Manage Programs…**, plus user apps with menu=`system`
+- **App Store 🛍** — install extra apps from configured GitHub catalogs (default: [ttypedesk-apps](https://github.com/RetroCodeRamen/ttypedesk-apps)); installed apps register themselves into Programs/System automatically. See [docs/appstore.md](docs/appstore.md)
 - **Quit**
 
 **Add Program…** — set **Desk name** (e.g. Task Manager), **Command** (e.g. `htop`), emoji, **Start menu** folder (Programs or System), optional desktop shortcut.
@@ -99,7 +100,7 @@ Native app panics are isolated to that window (red crash screen; Esc/Q closes it
 
 ## Config
 
-`~/.config/ttypedesk/config.json` — FPS, shell, theme, taskbar dock, desktop icons, wallpaper, notify, **file associations** / default apps, and Files options. See [docs/associations.md](docs/associations.md) and [docs/files.md](docs/files.md).
+`~/.config/ttypedesk/config.json` — FPS, shell, theme, taskbar dock, desktop icons, wallpaper, notify, **file associations** / default apps, App Store sources, and Files options. See [docs/associations.md](docs/associations.md), [docs/files.md](docs/files.md), and [docs/appstore.md](docs/appstore.md).
 
 The file is hot-reloaded: edit it directly (or let a second instance / sync tool write it) and the running desktop picks it up within ~2 seconds — no restart required.
 
