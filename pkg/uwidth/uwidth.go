@@ -91,7 +91,7 @@ var emojiASCII = map[string]string{
 	"🚀": ">", "■": "#", "⌘": "*", "⭐": "*", "🔍": "?", "🔢": "=",
 	"🔌": "@", "🗔": "W", "⏻": "Q",
 	"🛍": "S", "➕": "+", "🪟": "W", "📄": "P", "⚠": "!", "⚠️": "!", "📦": "B",
-	"🦊": "F",
+	"🦊": "F", "📺": "V", "🗂": "D", "🎨": "A",
 }
 
 // ContainsWide reports whether s has any double-width rune.
