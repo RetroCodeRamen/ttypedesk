@@ -31,10 +31,11 @@ outside Debian/Ubuntu, prompting for `sudo` right there in your terminal if it's
 needed — nothing is ever stored), bootstraps a per-user Go toolchain if yours is
 too old, clones the repo, builds it, and drops `ttypedesk` in `~/.local/bin`.
 
-**Not fully tested yet** — it's fresh off the workbench and hasn't been run
-against a truly clean machine. If it eats your terminal, you get to keep both
-pieces. Cloning manually and running `./build.sh` (below) is the tested path
-until this gets a few more real runs under it.
+Verified against clean containers on Ubuntu 24.04, Debian 12, and Fedora
+(apt/dnf paths, both root-without-`sudo` and regular-user-with-`sudo`) —
+including `ttypedesk -update` running from its own already-executing binary.
+Other distros (pacman/zypper/apk) are best-effort and less exercised;
+cloning manually and running `./build.sh` (below) is always the fallback.
 
 ### Updating
 
