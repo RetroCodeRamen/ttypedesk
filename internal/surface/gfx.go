@@ -15,16 +15,16 @@ import (
 
 // GfxSurface renders an RGBA image as half-block cells.
 type GfxSurface struct {
-	id     string
-	title  string
-	img    image.Image
-	cols   int
-	rows   int
-	offX   int
-	offY   int
-	cells  []cell.Cell
-	dirty  bool
-	mu     sync.Mutex
+	id    string
+	title string
+	img   image.Image
+	cols  int
+	rows  int
+	offX  int
+	offY  int
+	cells []cell.Cell
+	dirty bool
+	mu    sync.Mutex
 }
 
 func NewGfxSurface(id, title, path string, cols, rows int) (*GfxSurface, error) {

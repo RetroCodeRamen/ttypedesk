@@ -21,14 +21,14 @@ type App struct {
 	onSave func(config.Config)
 	ctx    *uiapp.Context
 
-	dir   string
-	ents  []entry
-	sel   int
+	dir    string
+	ents   []entry
+	sel    int
 	scroll uiapp.ScrollState
-	err   string
+	err    string
 	status string
 
-	mode string // browse | settings | prompt | confirm
+	mode       string // browse | settings | prompt | confirm
 	promptKind string // mkdir | rename | path | delete
 	promptBuf  string
 	clipPaths  []string
@@ -38,11 +38,11 @@ type App struct {
 }
 
 type entry struct {
-	name  string
-	path  string
-	isDir bool
-	size  int64
-	mtime time.Time
+	name   string
+	path   string
+	isDir  bool
+	size   int64
+	mtime  time.Time
 	hidden bool
 }
 

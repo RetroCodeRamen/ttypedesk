@@ -12,14 +12,14 @@ import (
 
 // PtySurface hosts a shell/TUI in a PTY + libvterm.
 type PtySurface struct {
-	id         string
+	id           string
 	defaultTitle string
-	term       *vterm.Term
-	pty        *tty.Handle
-	mu         sync.Mutex
-	closed     bool
-	done       chan struct{}
-	readDone   chan struct{}
+	term         *vterm.Term
+	pty          *tty.Handle
+	mu           sync.Mutex
+	closed       bool
+	done         chan struct{}
+	readDone     chan struct{}
 }
 
 // PtyOpts configures PTY spawn.

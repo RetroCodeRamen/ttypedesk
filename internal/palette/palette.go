@@ -45,25 +45,25 @@ type Recipe struct {
 
 // Env is everything providers need from the desk (no UI).
 type Env struct {
-	Query     string
-	Max       int
-	Launch    func(action string) error
-	OpenPath  func(path string) error
-	Focus     func(id string)
-	OpenFind  func(query string)
-	Quit      func()
-	Notify    func(title, body string)
+	Query      string
+	Max        int
+	Launch     func(action string) error
+	OpenPath   func(path string) error
+	Focus      func(id string)
+	OpenFind   func(query string)
+	Quit       func()
+	Notify     func(title, body string)
 	CopyText   func(text string)
 	ApplyTheme func(id string) // theme pack id: xp, scarlet, bumble, bubble, sprout
 	// Confirm asks the user to confirm a dangerous recipe. Return false to abort.
 	// Implementations may keep the palette open for a second Enter.
-	Confirm func(prompt, action string) bool
+	Confirm    func(prompt, action string) bool
 	Windows    []Win
 	Icons      []Icon
 	Programs   []Program
 	Recipes    []Recipe
 	History    []string // recent queries, newest first
-	AsciiIcons bool      // draw ASCII substitutes instead of emoji
+	AsciiIcons bool     // draw ASCII substitutes instead of emoji
 }
 
 // Search returns ranked hits for the current query.
@@ -192,7 +192,7 @@ func historyHits(env Env) []Hit {
 func catalogHits(env Env, filter string) []Hit {
 	type item struct {
 		title, sub, icon, action string
-		score                      int
+		score                    int
 	}
 	builtins := []item{
 		{"Terminal", "open terminal", "💻", "terminal", 50},

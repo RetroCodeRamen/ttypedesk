@@ -25,14 +25,14 @@ type Event struct {
 
 // App is a month-view calendar with local events.
 type App struct {
-	view     time.Time // first of displayed month
-	sel      time.Time // selected day
-	events   []Event
-	mode     int // 0 month, 1 agenda/edit title
-	editBuf  string
-	status   string
-	cursor   int // agenda selection
-	dirty    bool
+	view    time.Time // first of displayed month
+	sel     time.Time // selected day
+	events  []Event
+	mode    int // 0 month, 1 agenda/edit title
+	editBuf string
+	status  string
+	cursor  int // agenda selection
+	dirty   bool
 }
 
 func New() *App {

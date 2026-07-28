@@ -9,7 +9,7 @@ import (
 type FilesCfg struct {
 	View          string `json:"view"` // list | grid
 	ShowHidden    bool   `json:"show_hidden"`
-	Sort          string `json:"sort"` // name | size | mtime
+	Sort          string `json:"sort"`      // name | size | mtime
 	StartDir      string `json:"start_dir"` // home | last | path
 	ConfirmDelete bool   `json:"confirm_delete"`
 	LastDir       string `json:"last_dir,omitempty"`

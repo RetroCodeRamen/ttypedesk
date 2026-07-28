@@ -13,19 +13,19 @@ const Version = 1
 type MessageType string
 
 const (
-	TypeKey           MessageType = "key"
-	TypeMouse         MessageType = "mouse"
-	TypeResize        MessageType = "resize"
-	TypeFocus         MessageType = "focus"
-	TypeCreateWindow  MessageType = "create_window"
-	TypeCloseWindow   MessageType = "close_window"
-	TypeMaximize      MessageType = "maximize"
-	TypeScreenDiff    MessageType = "screen_diff"
-	TypeTitleChanged  MessageType = "title_changed"
-	TypeBell          MessageType = "bell"
-	TypeAttach        MessageType = "attach"
-	TypeDetach        MessageType = "detach"
-	TypeSnapshot      MessageType = "snapshot"
+	TypeKey          MessageType = "key"
+	TypeMouse        MessageType = "mouse"
+	TypeResize       MessageType = "resize"
+	TypeFocus        MessageType = "focus"
+	TypeCreateWindow MessageType = "create_window"
+	TypeCloseWindow  MessageType = "close_window"
+	TypeMaximize     MessageType = "maximize"
+	TypeScreenDiff   MessageType = "screen_diff"
+	TypeTitleChanged MessageType = "title_changed"
+	TypeBell         MessageType = "bell"
+	TypeAttach       MessageType = "attach"
+	TypeDetach       MessageType = "detach"
+	TypeSnapshot     MessageType = "snapshot"
 )
 
 // Envelope wraps every message.
@@ -37,22 +37,22 @@ type Envelope struct {
 }
 
 type KeyEvent struct {
-	Rune    rune   `json:"rune,omitempty"`
-	Key     string `json:"key,omitempty"`
-	Ctrl    bool   `json:"ctrl,omitempty"`
-	Alt     bool   `json:"alt,omitempty"`
-	Shift   bool   `json:"shift,omitempty"`
-	Bytes   []byte `json:"bytes,omitempty"`
+	Rune  rune   `json:"rune,omitempty"`
+	Key   string `json:"key,omitempty"`
+	Ctrl  bool   `json:"ctrl,omitempty"`
+	Alt   bool   `json:"alt,omitempty"`
+	Shift bool   `json:"shift,omitempty"`
+	Bytes []byte `json:"bytes,omitempty"`
 }
 
 type MouseEvent struct {
-	X       int    `json:"x"`
-	Y       int    `json:"y"`
-	Button  int    `json:"button"`
-	Action  string `json:"action"` // press, release, drag, move, wheel
-	Ctrl    bool   `json:"ctrl,omitempty"`
-	Alt     bool   `json:"alt,omitempty"`
-	Shift   bool   `json:"shift,omitempty"`
+	X      int    `json:"x"`
+	Y      int    `json:"y"`
+	Button int    `json:"button"`
+	Action string `json:"action"` // press, release, drag, move, wheel
+	Ctrl   bool   `json:"ctrl,omitempty"`
+	Alt    bool   `json:"alt,omitempty"`
+	Shift  bool   `json:"shift,omitempty"`
 }
 
 type ResizeEvent struct {
@@ -81,19 +81,19 @@ type TitleChanged struct {
 }
 
 type SnapshotWindow struct {
-	ID       string    `json:"id"`
-	Title    string    `json:"title"`
-	X        int       `json:"x"`
-	Y        int       `json:"y"`
-	W        int       `json:"w"`
-	H        int       `json:"h"`
-	Z        int       `json:"z"`
-	Focused  bool      `json:"focused"`
-	Maximized bool     `json:"maximized"`
-	Kind     string    `json:"kind"`
-	Cells    []cell.Cell `json:"cells,omitempty"`
-	Cols     int       `json:"cols"`
-	Rows     int       `json:"rows"`
+	ID        string      `json:"id"`
+	Title     string      `json:"title"`
+	X         int         `json:"x"`
+	Y         int         `json:"y"`
+	W         int         `json:"w"`
+	H         int         `json:"h"`
+	Z         int         `json:"z"`
+	Focused   bool        `json:"focused"`
+	Maximized bool        `json:"maximized"`
+	Kind      string      `json:"kind"`
+	Cells     []cell.Cell `json:"cells,omitempty"`
+	Cols      int         `json:"cols"`
+	Rows      int         `json:"rows"`
 }
 
 type Snapshot struct {

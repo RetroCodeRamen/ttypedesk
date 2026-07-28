@@ -24,12 +24,12 @@ type CloseSink func()
 // and apps call those (e.g. Files reload → SetTitle) which used to deadlock
 // the entire desktop with no panic log.
 type AppSurface struct {
-	id    string
-	app   uiapp.App
+	id     string
+	app    uiapp.App
 	canvas *uiapp.Canvas
-	ctx   *uiapp.Context
-	cols  int
-	rows  int
+	ctx    *uiapp.Context
+	cols   int
+	rows   int
 
 	mu       sync.Mutex // draw / handle / lifecycle
 	titleMu  sync.Mutex // title + sinks only

@@ -13,17 +13,17 @@ import (
 
 // App is the TTYPE Desk Settings control panel.
 type App struct {
-	cfg       config.Config
-	onSave    func(config.Config)
-	onNotify  func(title, body string)
-	onClearN  func()
-	ctx       *uiapp.Context
-	page      int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about
-	sel       int
-	editing   bool
-	editBuf   string
-	status    string
-	hkEdit    string // action id while editing a hotkey
+	cfg      config.Config
+	onSave   func(config.Config)
+	onNotify func(title, body string)
+	onClearN func()
+	ctx      *uiapp.Context
+	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about
+	sel      int
+	editing  bool
+	editBuf  string
+	status   string
+	hkEdit   string // action id while editing a hotkey
 }
 
 func New(cfg config.Config, onSave func(config.Config), onNotify func(title, body string), onClearNotices ...func()) *App {
