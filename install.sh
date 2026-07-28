@@ -27,17 +27,28 @@ have_build_tools() {
 
 if ! have_build_tools; then
   echo "-- Installing build dependencies (git, gcc, binutils) --"
-  echo "-- This runs as a normal command in this window, so you'll be prompted for your sudo password right here if it's needed. --"
+  # Root (common in minimal containers/servers) has no sudo binary at all —
+  # don't assume one exists just because we're not already privileged.
+  SUDO=""
+  if [ "$(id -u)" != "0" ]; then
+    if command -v sudo >/dev/null 2>&1; then
+      SUDO="sudo"
+      echo "-- This runs as a normal command in this window, so you'll be prompted for your sudo password right here if it's needed. --"
+    else
+      echo "ERROR: not running as root and 'sudo' isn't available — install git, gcc, and binutils yourself (or re-run as root), then re-run this script."
+      exit 1
+    fi
+  fi
   if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update && sudo apt-get install -y git gcc make binutils ca-certificates curl
+    $SUDO apt-get update && $SUDO apt-get install -y git gcc make binutils ca-certificates curl
   elif command -v dnf >/dev/null 2>&1; then
-    sudo dnf install -y git gcc make binutils ca-certificates curl
+    $SUDO dnf install -y git gcc make binutils ca-certificates curl
   elif command -v pacman >/dev/null 2>&1; then
-    sudo pacman -Sy --noconfirm git gcc make binutils ca-certificates curl
+    $SUDO pacman -Sy --noconfirm git gcc make binutils ca-certificates curl
   elif command -v zypper >/dev/null 2>&1; then
-    sudo zypper install -y git gcc make binutils ca-certificates curl
+    $SUDO zypper install -y git gcc make binutils ca-certificates curl
   elif command -v apk >/dev/null 2>&1; then
-    sudo apk add git gcc make binutils build-base ca-certificates curl
+    $SUDO apk add git gcc make binutils build-base ca-certificates curl
   else
     echo "WARN: no known package manager found (looked for apt-get/dnf/pacman/zypper/apk)."
     echo "WARN: install git, gcc, and binutils (ar) yourself, then re-run this script."
@@ -95,15 +106,18 @@ fi
 echo "-- Go OK: $(command -v go) ($(go env GOVERSION)) --"
 
 # ---- clone or update ----
+# Full history, not --depth 1: scripts/version.sh counts commits so far this
+# calendar month to build the version string, which needs real history to
+# count against — a shallow clone would always see just the 1 commit it has.
 if [ -d "$SRC_DIR/.git" ]; then
   echo "-- Updating existing checkout in $SRC_DIR --"
-  if ! git -C "$SRC_DIR" fetch --depth 1 origin "$BRANCH" || ! git -C "$SRC_DIR" reset --hard "origin/$BRANCH"; then
+  if ! git -C "$SRC_DIR" fetch origin "$BRANCH" || ! git -C "$SRC_DIR" reset --hard "origin/$BRANCH"; then
     echo "ERROR: failed to update $SRC_DIR"
     exit 1
   fi
 else
   echo "-- Cloning $REPO_URL into $SRC_DIR --"
-  if ! git clone --depth 1 -b "$BRANCH" "$REPO_URL" "$SRC_DIR"; then
+  if ! git clone -b "$BRANCH" "$REPO_URL" "$SRC_DIR"; then
     echo "ERROR: git clone failed"
     exit 1
   fi
@@ -117,9 +131,20 @@ if ! (cd "$SRC_DIR" && ./build.sh); then
 fi
 
 # ---- install ----
+# Stage to a temp file and rename over the target rather than copying
+# straight onto it: `ttypedesk -update` runs this script from the *running*
+# binary, and overwriting a busy executable in place fails with "Text file
+# busy" — rename() replaces the directory entry instead of touching the
+# original (still-running) inode, so it works even while ttypedesk is live.
 mkdir -p "$BIN_DIR"
-cp "$SRC_DIR/bin/ttypedesk" "$BIN_DIR/ttypedesk"
-chmod +x "$BIN_DIR/ttypedesk"
+TMP_BIN="$(mktemp "$BIN_DIR/.ttypedesk.XXXXXX")"
+if ! cp "$SRC_DIR/bin/ttypedesk" "$TMP_BIN"; then
+  echo "ERROR: failed to stage the new binary"
+  rm -f "$TMP_BIN"
+  exit 1
+fi
+chmod +x "$TMP_BIN"
+mv -f "$TMP_BIN" "$BIN_DIR/ttypedesk"
 
 echo "== Installed: $BIN_DIR/ttypedesk =="
 case ":$PATH:" in
