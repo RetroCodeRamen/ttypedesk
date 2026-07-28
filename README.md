@@ -36,6 +36,16 @@ against a truly clean machine. If it eats your terminal, you get to keep both
 pieces. Cloning manually and running `./build.sh` (below) is the tested path
 until this gets a few more real runs under it.
 
+### Updating
+
+```bash
+ttypedesk -update
+```
+
+Re-runs the installer above in place: pulls the latest `master`, rebuilds,
+and reinstalls to `~/.local/bin/ttypedesk`. Same thing as re-running the
+one-liner by hand.
+
 ## Build
 
 ```bash

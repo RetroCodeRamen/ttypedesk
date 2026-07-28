@@ -1,10 +1,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"runtime/debug"
 	"strings"
@@ -16,6 +18,33 @@ import (
 	"github.com/ttypedesk/ttypedesk/internal/server"
 	"github.com/ttypedesk/ttypedesk/internal/slog"
 )
+
+// installerURL is the same one-line installer documented in the README —
+// re-running it updates an existing checkout (git fetch + reset --hard)
+// and rebuilds/reinstalls, so -update just shells out to it rather than
+// duplicating that logic here.
+const installerURL = "https://raw.githubusercontent.com/RetroCodeRamen/ttypedesk/master/install.sh"
+
+// runUpdate fetches and runs the installer script, inheriting the
+// terminal's stdio so build output and any sudo password prompt (for
+// missing build deps) show up live. Returns the process exit code.
+func runUpdate() int {
+	fmt.Fprintln(os.Stderr, "TTYPE Desk: fetching and running the latest installer...")
+	cmd := exec.Command("bash", "-c", "curl -fsSL "+installerURL+" | bash")
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
+	if err == nil {
+		return 0
+	}
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	fmt.Fprintf(os.Stderr, "update failed: %v\n", err)
+	return 1
+}
 
 func main() {
 	// A stalled/dropped SSH link can make sshd tear down the session and send
@@ -38,7 +67,12 @@ func main() {
 	execCmd := flag.String("e", "", "command to run in initial terminal (instead of $SHELL)")
 	imagePath := flag.String("image", "", "open Image Viewer on this file at startup")
 	clock := flag.Bool("clock", false, "open Clock app at startup")
+	update := flag.Bool("update", false, "rebuild and reinstall the latest master, then exit")
 	flag.Parse()
+
+	if *update {
+		os.Exit(runUpdate())
+	}
 
 	if err := slog.Init(); err != nil {
 		log.Printf("log init: %v", err)
