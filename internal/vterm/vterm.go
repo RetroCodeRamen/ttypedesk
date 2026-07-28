@@ -204,7 +204,11 @@ type Term struct {
 	// (observed as a SIGSEGV inside vterm_set_size under rapid resize).
 	// Callbacks (goDamage etc.) only ever take mu, never vtMu, so holding
 	// vtMu across a libvterm call — which synchronously re-enters Go via
-	// those callbacks — can't deadlock.
+	// those callbacks — can't deadlock, as long as vtMu is always acquired
+	// before mu (never the reverse) wherever both are needed. Snapshot,
+	// ProduceDiff, and SearchScrollback read t.screen via readRect, so they
+	// hold vtMu for their whole body too (same nesting order), not just
+	// mu — readRect itself does no locking and relies on that.
 	vtMu       sync.Mutex
 	handle     cgo.Handle
 	rows       int
@@ -468,10 +472,12 @@ func (t *Term) lineTextLocked(abs int, screen []cell.Cell) string {
 // SearchScrollback finds query in scrollback+screen. towardOlder=true searches into history.
 // On success, scrolls so the match line is visible near the top and returns true.
 func (t *Term) SearchScrollback(query string, towardOlder bool) (found bool, matches int) {
+	t.vtMu.Lock()
+	defer t.vtMu.Unlock()
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	q := strings.TrimSpace(query)
-	if q == "" || t.altScreen {
+	if q == "" || t.altScreen || t.screen == nil {
 		return false, 0
 	}
 	qLower := strings.ToLower(q)
@@ -608,14 +614,24 @@ func (t *Term) collectOutput(fn func(vt *C.VTerm)) []byte {
 }
 
 func (t *Term) Snapshot() []cell.Cell {
+	t.vtMu.Lock()
+	defer t.vtMu.Unlock()
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.screen == nil {
+		return blankCells(t.cols, t.rows, t.defFG, t.defBG)
+	}
 	return t.viewLocked()
 }
 
 func (t *Term) ProduceDiff() cell.Diff {
+	t.vtMu.Lock()
+	defer t.vtMu.Unlock()
 	t.mu.Lock()
 	defer t.mu.Unlock()
+	if t.screen == nil {
+		return cell.Diff{}
+	}
 	if t.scrollOff != 0 || t.full {
 		t.full = false
 		t.dirty = make(map[int]struct{})
@@ -677,6 +693,10 @@ func (t *Term) viewLocked() []cell.Cell {
 	return out
 }
 
+// readRect reads t.screen directly with no locking of its own — every
+// caller must already hold vtMu for the full duration (t.screen is only
+// ever nil-checked by the caller before this runs) plus mu (for t.cols
+// etc. where relevant).
 func (t *Term) readRect(x, y, w, h int) []cell.Cell {
 	out := make([]cell.Cell, w*h)
 	for row := 0; row < h; row++ {
@@ -685,6 +705,16 @@ func (t *Term) readRect(x, y, w, h int) []cell.Cell {
 			C.fill_go_cell(t.screen, C.int(y+row), C.int(x+col), &gc)
 			out[row*w+col] = goCellToCell(gc)
 		}
+	}
+	return out
+}
+
+// blankCells returns a cols*rows grid of spaces in the given colors, used
+// once a Term is closed and there's no libvterm screen left to read from.
+func blankCells(cols, rows int, fg, bg cell.Color) []cell.Cell {
+	out := make([]cell.Cell, cols*rows)
+	for i := range out {
+		out[i] = cell.Cell{Rune: ' ', FG: fg, BG: bg}
 	}
 	return out
 }
