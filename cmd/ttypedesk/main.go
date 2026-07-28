@@ -19,6 +19,10 @@ import (
 	"github.com/ttypedesk/ttypedesk/internal/slog"
 )
 
+// version is baked in at build time via build.sh's -ldflags -X, computed by
+// scripts/version.sh as MAJOR.MINOR.YYMMNN (NN = commits this month).
+var version = "dev"
+
 // installerURL is the same one-line installer documented in the README —
 // re-running it updates an existing checkout (git fetch + reset --hard)
 // and rebuilds/reinstalls, so -update just shells out to it rather than
@@ -68,7 +72,13 @@ func main() {
 	imagePath := flag.String("image", "", "open Image Viewer on this file at startup")
 	clock := flag.Bool("clock", false, "open Clock app at startup")
 	update := flag.Bool("update", false, "rebuild and reinstall the latest master, then exit")
+	showVersion := flag.Bool("version", false, "print version and exit")
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Println("TTYPE Desk " + version)
+		return
+	}
 
 	if *update {
 		os.Exit(runUpdate())

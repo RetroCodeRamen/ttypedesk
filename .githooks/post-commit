@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Tags every commit with the current version (MAJOR.MINOR.YYMMNN — see
+# scripts/version.sh). Runs automatically once this repo's core.hooksPath
+# points here (see README/CONTRIBUTING for the one-time `git config` setup).
+set -uo pipefail
+ROOT="$(git rev-parse --show-toplevel)"
+VER="$("$ROOT/scripts/version.sh")" || exit 0
+git tag "v$VER" 2>/dev/null && echo "tagged v$VER"

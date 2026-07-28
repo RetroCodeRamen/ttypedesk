@@ -152,6 +152,19 @@ Panics and LaunchAction failures are written here — check this file when somet
 
 Keyboard and mouse (press/drag/release/wheel) forward to the host; window chrome — dragging, resizing, taskbar, Start menu — is still host-side only. See [docs/remote.md](docs/remote.md) for how a future RDP/VNC decoder plugs in as a graphical surface.
 
+## Versioning
+
+`MAJOR.MINOR.YYMMNN` — e.g. `0.3.260722`. `MAJOR.MINOR` lives in [VERSION](VERSION)
+and is bumped by hand; `YYMMNN` is computed by [scripts/version.sh](scripts/version.sh)
+(year, month, and a count of commits so far this calendar month) and baked
+into the binary at build time (`./build.sh`, or `ttypedesk -version` to
+check what's running). Still `0` for major — no compatibility promises yet,
+config shape and internal APIs are still moving.
+
+Every commit gets tagged automatically (`v0.3.260722`, …) via a `post-commit`
+hook once `core.hooksPath` points at [.githooks](.githooks) — `./build.sh`
+sets that the first time you run it in a fresh clone.
+
 ## Roadmap
 
 Upcoming work is tracked in [ROADMAP.md](ROADMAP.md) — a growing pile of ideas ranging from "reasonable" to "an ASCII video player," in no particular order of restraint. SSH streaming notes: [docs/ssh.md](docs/ssh.md).

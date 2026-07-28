@@ -8,5 +8,10 @@ if [[ ! -f "$LV/build/libvterm.a" ]]; then
   (cd "$LV/build" && gcc -std=c99 -O2 -I../include -I../src -c ../src/*.c && ar rcs libvterm.a *.o)
 fi
 cd "$ROOT"
-go build -o bin/ttypedesk ./cmd/ttypedesk
-echo "Built $ROOT/bin/ttypedesk"
+if [[ -d .git ]] && [[ "$(git config --get core.hooksPath || true)" != ".githooks" ]]; then
+  git config core.hooksPath .githooks
+  echo "-- Set core.hooksPath = .githooks (auto-tags each commit with its version) --"
+fi
+VERSION="$("$ROOT/scripts/version.sh")"
+go build -ldflags "-X main.version=$VERSION" -o bin/ttypedesk ./cmd/ttypedesk
+echo "Built $ROOT/bin/ttypedesk ($VERSION)"
