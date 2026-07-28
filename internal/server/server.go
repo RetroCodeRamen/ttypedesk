@@ -19,6 +19,7 @@ import (
 	"github.com/ttypedesk/ttypedesk/apps/mgrprog"
 	"github.com/ttypedesk/ttypedesk/apps/notes"
 	"github.com/ttypedesk/ttypedesk/apps/settings"
+	"github.com/ttypedesk/ttypedesk/internal/bridge"
 	"github.com/ttypedesk/ttypedesk/internal/config"
 	"github.com/ttypedesk/ttypedesk/internal/notify"
 	"github.com/ttypedesk/ttypedesk/internal/proto"
@@ -304,6 +305,11 @@ func (s *Server) launchAction(action string) error {
 			_, err := s.CreateApp(action[4:], action[4:])
 			return err
 		}
+		if len(action) > 7 && action[:7] == "bridge:" {
+			cmd := action[7:]
+			_, err := s.CreateBridge(cmd, cmd)
+			return err
+		}
 		_, err := s.CreateApp(action, action)
 		return err
 	}
@@ -490,6 +496,21 @@ func (s *Server) CreateGfx(title, path string) (*Window, error) {
 	return win, nil
 }
 
+// CreateBridge opens command as a bridged GUI app (see internal/bridge) —
+// an off-screen Xvfb rendering the target X11 program, captured into cells.
+func (s *Server) CreateBridge(title, command string) (*Window, error) {
+	s.mu.Lock()
+	win, err := s.createLocked("bridge", title, "", "", command, nil, false)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	win.Launch = "bridge:" + command
+	s.mu.Unlock()
+	return win, nil
+}
+
 func (s *Server) create(kind, title, appName, path string) (*Window, error) {
 	s.mu.Lock()
 	win, err := s.createLocked(kind, title, appName, path, "", nil, false)
@@ -646,6 +667,14 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 		surf, err = surface.NewAppSurface(id, "Image Viewer", app, cc, cr)
 		title = "Image Viewer"
 		kind = "app"
+	case "bridge":
+		if command == "" {
+			return nil, fmt.Errorf("bridge: empty command")
+		}
+		surf, err = bridge.New(id, command, cc, cr)
+		if title == "" {
+			title = command
+		}
 	default:
 		return nil, fmt.Errorf("unknown kind %q", kind)
 	}

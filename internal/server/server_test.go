@@ -1,6 +1,7 @@
 package server
 
 import (
+	"os/exec"
 	"testing"
 
 	"github.com/ttypedesk/ttypedesk/internal/config"
@@ -445,6 +446,40 @@ func TestLaunchActionFilesRoutesThroughFileManagerRole(t *testing.T) {
 	wins := s.Windows()
 	if len(wins) != 1 || wins[0].Launch != "prog:appstore-superfile" {
 		t.Fatalf("Windows() = %v, want a single prog:appstore-superfile window", ids(wins))
+	}
+}
+
+// TestLaunchActionBridgeCreatesWindow confirms the "bridge:<cmd>"
+// LaunchAction prefix, the "bridge" createLocked case, and CreateBridge all
+// actually wire together — internal/bridge's own tests cover BridgeSurface
+// in isolation, this covers the server-level plumbing. Needs a real (if
+// headless) X server, like internal/bridge's tests.
+func TestLaunchActionBridgeCreatesWindow(t *testing.T) {
+	if _, err := exec.LookPath("Xvfb"); err != nil {
+		t.Skip("Xvfb not on PATH, skipping (apt install xvfb to run this locally)")
+	}
+	if _, err := exec.LookPath("xclock"); err != nil {
+		t.Skip("xclock not on PATH, skipping (apt install x11-apps to run this locally)")
+	}
+
+	s := newTestServer()
+	if err := s.LaunchAction("bridge:xclock"); err != nil {
+		t.Fatalf("LaunchAction(bridge:xclock): %v", err)
+	}
+	wins := s.Windows()
+	if len(wins) != 1 {
+		t.Fatalf("Windows() len = %d, want 1", len(wins))
+	}
+	win := wins[0]
+	defer s.CloseWindow(win.ID)
+	if win.Kind != "bridge" {
+		t.Fatalf("Kind = %q, want bridge", win.Kind)
+	}
+	if win.Launch != "bridge:xclock" {
+		t.Fatalf("Launch = %q, want bridge:xclock", win.Launch)
+	}
+	if win.Title != "xclock" {
+		t.Fatalf("Title = %q, want xclock", win.Title)
 	}
 }
 
