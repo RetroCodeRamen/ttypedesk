@@ -166,6 +166,21 @@ Every commit gets tagged automatically (`v0.3.260722`, …) via a `post-commit`
 hook once `core.hooksPath` points at [.githooks](.githooks) — `./build.sh`
 sets that the first time you run it in a fresh clone.
 
+### Post-1.0 stability policy
+
+Once major hits `1`, two surfaces stop moving casually:
+
+- **`config.json`** — additive-only. New fields always get a safe zero-value
+  default (so an old config still loads fine); existing field names/types
+  don't change, and nothing gets silently repurposed. This is already how
+  hot-reload behaves in practice — it's a promise, not new machinery.
+- **The App SDK** (`pkg/uiapp` — `App`, `Host`, `Context`, `Canvas`) — the
+  interface native apps (built-in or third-party) are written against. Same
+  treatment: additive, no breaking renames without a major bump.
+
+Everything else — internal packages, the App Store catalog format, CLI
+flags — can still change; those aren't the stability contract.
+
 ## Roadmap
 
 Upcoming work is tracked in [ROADMAP.md](ROADMAP.md) — a growing pile of ideas ranging from "reasonable" to "an ASCII video player," in no particular order of restraint. SSH streaming notes: [docs/ssh.md](docs/ssh.md).
