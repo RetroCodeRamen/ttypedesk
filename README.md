@@ -40,7 +40,13 @@ And yes, it's an actual window manager — drag, stack, focus, resize, three win
   <img src="images/multi-window.png" alt="Three stacked windows — Settings, Notes, and a real bash session" width="640">
 </p>
 
-There's also a GUI–TUI Bridge that renders real, unmodified X11 apps as windows in the desktop (`bridge:firefox`, `bridge:gimp`, genuinely anything), a folder manager, a Calendar, an App Store, and a notification center. [MANUAL.md](MANUAL.md) has the full tour; keep reading here for the parts you actually need to get it running.
+And here's the part that really shouldn't work: the **GUI–TUI Bridge** renders real, unmodified X11 apps as windows in the desktop — not a screenshot of one, an actual live `xeyes` process launched and captured in the background, re-encoded frame-by-frame as half-block cells, tracking your mouse in real time:
+
+<p align="center">
+  <img src="images/bridge.png" alt="A real xeyes X11 app bridged into the desktop as a half-block-rendered window" width="640">
+</p>
+
+`bridge:firefox`, `bridge:gimp`, genuinely any X11 app — see [docs/gui-bridge.md](docs/gui-bridge.md) for how. There's also a folder manager, a Calendar, an App Store, and a notification center. [MANUAL.md](MANUAL.md) has the full tour; keep reading here for the parts you actually need to get it running.
 
 ## Requirements
 
