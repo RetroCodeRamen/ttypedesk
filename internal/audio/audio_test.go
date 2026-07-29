@@ -3,6 +3,7 @@ package audio
 import (
 	"encoding/binary"
 	"io"
+	"sync"
 	"testing"
 	"time"
 )
@@ -64,6 +65,49 @@ func TestChanReaderEOFWhenChannelClosed(t *testing.T) {
 	if err != io.EOF {
 		t.Fatalf("Read err = %v, want io.EOF", err)
 	}
+}
+
+// TestChanReaderReadIsSafeForConcurrentCallers is a regression test for a
+// real CI failure: oto/v3's Player.Play, called again to resume after a
+// Pause, doesn't reliably wait for the previous internal read goroutine to
+// exit first — briefly, two goroutines called Read on the same chanReader
+// concurrently, which produced a DATA RACE and then a slice-bounds panic
+// in the old, unlocked implementation. This drives that exact shape
+// directly: many goroutines reading concurrently while pcm is fed
+// continuously, under -race, with no crash and no race report as the bar.
+func TestChanReaderReadIsSafeForConcurrentCallers(t *testing.T) {
+	pcm := make(chan []int16)
+	stop := make(chan struct{})
+	r := &chanReader{pcm: pcm, stop: stop}
+	defer close(stop)
+
+	feedDone := make(chan struct{})
+	go func() {
+		defer close(feedDone)
+		for i := 0; i < 200; i++ {
+			select {
+			case pcm <- []int16{int16(i), int16(-i)}:
+			case <-stop:
+				return
+			}
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for g := 0; g < 4; g++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			buf := make([]byte, 3) // deliberately not a multiple of a sample, forces the buf/reslice path
+			for i := 0; i < 100; i++ {
+				if _, err := r.Read(buf); err != nil {
+					return
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	<-feedDone
 }
 
 func TestChanReaderEOFWhenStopped(t *testing.T) {

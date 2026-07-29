@@ -93,13 +93,26 @@ func Play(pcm <-chan []int16) (*Playback, error) {
 // oto's Player pulls from (raw little-endian bytes, matching
 // FormatSignedInt16LE) — decoupled from any real oto.Context so it can be
 // tested without real audio hardware.
+//
+// mu guards buf: confirmed via a real CI failure (a DATA RACE, then a
+// slice-bounds panic) that oto/v3's Player.Play, called again to resume
+// after a Pause, doesn't reliably wait for the previous internal read
+// goroutine to fully exit before starting a new one — briefly, two
+// goroutines can call Read concurrently on the same chanReader. The
+// channel receive from r.pcm is already safe for that on its own (Go
+// channels guarantee it), but the buf/copy/reslice sequence below isn't:
+// two goroutines racing copy(p, r.buf) and r.buf = r.buf[n:] against each
+// other is exactly what produced the out-of-range slice panic.
 type chanReader struct {
 	pcm  <-chan []int16
 	stop chan struct{}
+	mu   sync.Mutex
 	buf  []byte
 }
 
 func (r *chanReader) Read(p []byte) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	for len(r.buf) == 0 {
 		select {
 		case samples, ok := <-r.pcm:
