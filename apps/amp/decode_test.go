@@ -19,9 +19,8 @@ func requireFFmpeg(t *testing.T) {
 }
 
 // synthTone generates a short real WAV file (a 440Hz sine tone) via
-// ffmpeg's lavfi source — the same tool amp itself shells out to, so this
-// exercises startDecode against a real, valid audio file rather than a
-// hand-rolled fixture.
+// ffmpeg's lavfi source, for tests that need a real, valid audio file
+// rather than a hand-rolled fixture.
 func synthTone(t *testing.T, seconds float64) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "tone.wav")
@@ -34,7 +33,13 @@ func synthTone(t *testing.T, seconds float64) string {
 	return path
 }
 
-func TestStartDecodeProducesRealAudibleSamples(t *testing.T) {
+// The ffmpeg-subprocess pipeline itself (spawn, backpressure, stop,
+// missing-file handling) is internal/ffdecode's own responsibility and
+// tested there against real ffmpeg. What's specific to amp's decoder
+// wrapper is the visualizer — this confirms updateVis actually gets
+// wired up as ffdecode's onChunk hook and produces real, non-flat data
+// from a real decoded tone, not just that it type-checks.
+func TestDecoderVisualizerPopulatesFromRealAudio(t *testing.T) {
 	requireFFmpeg(t)
 	path := synthTone(t, 1)
 
@@ -45,86 +50,30 @@ func TestStartDecodeProducesRealAudibleSamples(t *testing.T) {
 	}
 	defer dec.stop()
 
-	var gotNonZero bool
-	var totalSamples int
 	deadline := time.After(10 * time.Second)
-loop:
 	for {
 		select {
-		case samples, ok := <-dec.pcm:
+		case _, ok := <-dec.pcm:
 			if !ok {
-				break loop
+				t.Fatal("pcm channel closed before the visualizer ever saw non-zero data")
 			}
-			totalSamples += len(samples)
-			for _, s := range samples {
-				if s != 0 {
-					gotNonZero = true
+			bars := dec.Vis()
+			var anyNonZero bool
+			for _, b := range bars {
+				if b > 0 {
+					anyNonZero = true
+					break
 				}
 			}
-		case ev := <-events:
-			if ev.err != nil {
-				t.Fatalf("decode error: %v", ev.err)
+			if anyNonZero {
+				return // success
 			}
-			if ev.ended {
-				break loop
+		case ev := <-events:
+			if ev.Err != nil {
+				t.Fatalf("decode error: %v", ev.Err)
 			}
 		case <-deadline:
-			t.Fatal("timed out waiting for decoded samples — ffmpeg pipeline likely stuck")
+			t.Fatal("timed out waiting for the visualizer to reflect real decoded audio")
 		}
-	}
-	if !gotNonZero {
-		t.Error("all decoded samples were zero — expected an audible 440Hz tone")
-	}
-	// 1 second at 48kHz stereo = 96000 samples; allow slack for ffmpeg's
-	// own startup/flush overhead rather than asserting an exact count.
-	if totalSamples < 40000 {
-		t.Errorf("totalSamples = %d, want at least ~40000 for a 1s stereo tone at 48kHz", totalSamples)
-	}
-}
-
-func TestStartDecodeMissingFileReportsErrorEvent(t *testing.T) {
-	requireFFmpeg(t)
-	events := make(chan trackEvent, 2)
-	dec, err := startDecode(filepath.Join(t.TempDir(), "does-not-exist.mp3"), events)
-	if err != nil {
-		// Some ffmpeg builds fail fast at Start(); either outcome is fine.
-		return
-	}
-	defer dec.stop()
-
-	select {
-	case ev := <-events:
-		if ev.err == nil && !ev.ended {
-			t.Error("expected an error (or at worst an immediate empty-ended) event for a missing input file")
-		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("timed out waiting for a decode-failure event")
-	}
-}
-
-func TestStartDecodeStopUnblocksFeedGoroutine(t *testing.T) {
-	requireFFmpeg(t)
-	path := synthTone(t, 5) // long enough that we can stop mid-decode
-
-	events := make(chan trackEvent, 2)
-	dec, err := startDecode(path, events)
-	if err != nil {
-		t.Fatalf("startDecode: %v", err)
-	}
-	// Deliberately never drain dec.pcm — the feeder should still be able
-	// to exit via stopCh instead of leaking, blocked forever on a send.
-	dec.stop()
-
-	done := make(chan struct{})
-	go func() {
-		for range dec.pcm {
-			// drain until feed's deferred close(d.pcm) fires
-		}
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("feed goroutine did not exit after stop() — pcm channel never closed")
 	}
 }

@@ -235,12 +235,12 @@ func (a *App) drainEvents() {
 	for {
 		select {
 		case ev := <-a.events:
-			if ev.err != nil {
-				a.status = ev.err.Error()
+			if ev.Err != nil {
+				a.status = ev.Err.Error()
 				a.stop()
 				return
 			}
-			if ev.ended {
+			if ev.Ended {
 				a.next()
 				return
 			}
