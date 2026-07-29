@@ -289,6 +289,45 @@ func TestLaunchActionKnownAndUnknown(t *testing.T) {
 	}
 }
 
+// TestCreateProgramBridgeRoutesThroughBridgeNotShell confirms a Program
+// with Bridge:true is dispatched to the GUI-TUI Bridge, not wrapped as a
+// shell command in a PTY — the two fail completely differently when the
+// named command doesn't exist, which is what this asserts. Skipped if
+// Xvfb happens to be on PATH: the point is distinguishing "tried to spawn
+// Xvfb" from "tried to run a shell command," and a working Xvfb changes
+// what a bogus command's failure looks like.
+func TestCreateProgramBridgeRoutesThroughBridgeNotShell(t *testing.T) {
+	if _, err := exec.LookPath("Xvfb"); err == nil {
+		t.Skip("Xvfb is on PATH in this environment; this test wants it absent")
+	}
+	s := newTestServer()
+	p := config.Program{ID: "p1", Name: "Definitely Not A Shell Command", Command: "totally-bogus-x11-app-xyz", Bridge: true}
+	if _, err := s.CreateProgram(p); err == nil {
+		t.Fatal("expected an error creating a Bridge program without Xvfb available")
+	} else if !strings.Contains(err.Error(), "Xvfb") {
+		t.Fatalf("error = %q, want it to mention Xvfb (i.e. actually routed through the Bridge)", err.Error())
+	}
+	if len(s.Windows()) != 0 {
+		t.Fatalf("a failed Bridge program launch should not leave a window behind, got %d", len(s.Windows()))
+	}
+}
+
+// TestCreateProgramWithoutBridgeStillUsesShell is the control case: the
+// same Program with Bridge left false goes through the ordinary shell PTY
+// path (which always succeeds at the Go level — sh starts fine even if
+// the command inside it doesn't exist).
+func TestCreateProgramWithoutBridgeStillUsesShell(t *testing.T) {
+	s := newTestServer()
+	p := config.Program{ID: "p2", Name: "Plain Shell Program", Command: "totally-bogus-x11-app-xyz"}
+	win, err := s.CreateProgram(p)
+	if err != nil {
+		t.Fatalf("CreateProgram (non-bridge): %v", err)
+	}
+	if win.Surface.Kind() != "pty" {
+		t.Fatalf("Kind() = %q, want pty", win.Surface.Kind())
+	}
+}
+
 func TestCaptureAndRestoreSessionRoundTrips(t *testing.T) {
 	s := newTestServer()
 	a, _ := s.CreateApp("clock", "Clock")

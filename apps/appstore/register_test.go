@@ -107,6 +107,43 @@ func TestRegisterEntryByIDNoopWhenUnchanged(t *testing.T) {
 	}
 }
 
+func TestRegisterEntryNewProgramCarriesBridgeFlag(t *testing.T) {
+	cfg := &config.Config{}
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-gimp", Name: "GIMP", Command: "gimp", Bridge: true},
+	}}
+
+	registerEntry(cfg, e)
+
+	if len(cfg.Programs) != 1 {
+		t.Fatalf("Programs len = %d, want 1", len(cfg.Programs))
+	}
+	if !cfg.Programs[0].Bridge {
+		t.Fatal("Programs[0].Bridge = false, want true")
+	}
+}
+
+func TestRegisterEntryByIDUpdatesBridgeFlagInPlace(t *testing.T) {
+	cfg := &config.Config{Programs: []config.Program{
+		{ID: "appstore-gimp", Name: "GIMP", Command: "gimp", Bridge: false},
+	}}
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-gimp", Name: "GIMP", Command: "gimp", Bridge: true},
+	}}
+
+	changed := registerEntry(cfg, e)
+
+	if !changed {
+		t.Fatal("registerEntry() = false, want true (bridge flag changed)")
+	}
+	if len(cfg.Programs) != 1 {
+		t.Fatalf("Programs len = %d, want 1 (no duplicate)", len(cfg.Programs))
+	}
+	if !cfg.Programs[0].Bridge {
+		t.Fatal("Programs[0].Bridge = false, want true after update")
+	}
+}
+
 func TestRegisterEntrySetsRoleOnNewProgram(t *testing.T) {
 	cfg := &config.Config{}
 	e := RemoteEntry{Register: []RegisterEntry{

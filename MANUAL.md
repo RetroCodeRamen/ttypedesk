@@ -89,11 +89,17 @@ often intercepted by the host terminal):
 Mouse: hover a row with a `▶` to open its flyout, click a leaf to launch.
 Keyboard: `↑↓` to move, `→`/`Enter` into a submenu, `←`/`Esc` back out.
 
-**Add Program…** registers a custom launcher: a desk name, a command (any
-`LaunchAction` string — a shell command, `pty:`, `bridge:`, `role:`, …), an
-optional emoji, which Start menu folder it lives in, and an optional
-desktop shortcut. **Manage Programs…** lists everything you've added for
-deletion (which also drops its desktop shortcut if it has one).
+**Add Program…** registers a custom launcher: a desk name, a command, an
+optional emoji, which Start menu folder it lives in, an optional desktop
+shortcut, and a **"Launch via GUI-TUI Bridge"** checkbox. Unchecked (the
+default), the command runs as a plain shell command in a PTY window — no
+`pty:`/`bridge:`/etc. prefix syntax needed or recognized here, just the
+command itself (e.g. `htop`). Checked, the same command launches through
+the [GUI-TUI Bridge](#guitui-app-bridge) instead — a real X11 app (e.g.
+`firefox`, `gimp`), half-block rendered, exactly like `bridge:firefox`
+elsewhere in this manual. **Manage Programs…** lists everything you've
+added (marking Bridge-backed ones) for deletion, which also drops its
+desktop shortcut if it has one.
 
 ## Command palette
 
@@ -393,9 +399,14 @@ technique Browsh popularized for web pages — off-screen capture → cell
 grid → floating window — generalized to arbitrary X11 apps instead of just
 a browser engine (TTYPE Desk doesn't embed or depend on Browsh itself).
 
-Launch one with `bridge:<command>` as a launch action — a desktop icon, an
-Add Program command, or straight from the palette (`bridge:firefox`,
-`bridge:gimp`, any X11 app). Under the hood:
+The easiest way to launch one: **Add Program…** (Start ▸ Programs ▸ Add
+Program) with **"Launch via GUI-TUI Bridge"** checked — enter the X11
+command (`firefox`, `gimp`, any X11 app) and it's registered as a normal
+Start-menu/taskbar/palette-searchable launcher that opens through the
+Bridge. Under the hood, that's `bridge:<command>` as a launch action —
+also usable directly by hand-editing a `desktop_icons` or `recipes` entry
+in `config.json` (no in-app editor for either yet), same syntax
+`pty:`/`prog:`/etc. use. Under the hood:
 
 - A dedicated, private `Xvfb` spawns per bridged window (nested — X11
   needed only for this feature, nothing else in the desktop touches it).

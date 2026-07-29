@@ -39,6 +39,10 @@ type RegisterEntry struct {
 	// (Start menu, desktop icons, "open this folder") switches to it
 	// instead of just adding an extra Programs entry.
 	SetRole string `json:"set_role,omitempty"`
+	// Bridge, if true, launches Command through the GUI-TUI Bridge (a
+	// real X11 app) instead of as a shell command in a PTY — for
+	// catalog entries that are themselves X11 GUI programs.
+	Bridge bool `json:"bridge,omitempty"`
 }
 
 // catalogIndex is the root shape of a source repo's index.json.

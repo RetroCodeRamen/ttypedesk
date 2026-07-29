@@ -22,7 +22,8 @@ type App struct {
 	icons    []string
 	menuSys  bool // false=Programs, true=System
 	desktop  bool
-	field    int // 0 name, 1 command, 2 icon, 3 menu, 4 desktop, 5 save, 6 cancel
+	bridge   bool // launch Command via the GUI-TUI Bridge instead of a shell PTY
+	field    int  // 0 name, 1 command, 2 icon, 3 menu, 4 desktop, 5 bridge, 6 save, 7 cancel
 	editing  bool
 	dropOpen bool
 	status   string
@@ -116,7 +117,7 @@ func (a *App) key(e uiapp.Event) error {
 			a.field--
 		}
 	case "Down", "Tab":
-		if a.field < 6 {
+		if a.field < 7 {
 			a.field++
 		}
 	case "Enter":
@@ -136,6 +137,8 @@ func (a *App) key(e uiapp.Event) error {
 			a.menuSys = !a.menuSys
 		case 4:
 			a.desktop = !a.desktop
+		case 5:
+			a.bridge = !a.bridge
 		}
 	default:
 		if e.Rune == ' ' {
@@ -179,12 +182,15 @@ func (a *App) mouse(e uiapp.Event) error {
 	case 6:
 		a.field = 4
 		a.desktop = !a.desktop
-	case 8:
+	case 7:
+		a.field = 5
+		a.bridge = !a.bridge
+	case 9:
 		if e.X < 16 {
-			a.field = 5
+			a.field = 6
 			a.save()
 		} else {
-			a.field = 6
+			a.field = 7
 			a.closing = true
 		}
 	}
@@ -218,8 +224,10 @@ func (a *App) activate() {
 	case 4:
 		a.desktop = !a.desktop
 	case 5:
-		a.save()
+		a.bridge = !a.bridge
 	case 6:
+		a.save()
+	case 7:
 		a.closing = true
 	}
 }
@@ -242,7 +250,11 @@ func (a *App) save() {
 		return
 	}
 	if cmd == "" {
-		a.status = "Command is required (e.g. htop)"
+		if a.bridge {
+			a.status = "X11 app command is required (e.g. firefox)"
+		} else {
+			a.status = "Command is required (e.g. htop)"
+		}
 		return
 	}
 	icon := "🚀"
@@ -261,6 +273,7 @@ func (a *App) save() {
 		Icon:    icon,
 		Menu:    menu,
 		Desktop: a.desktop,
+		Bridge:  a.bridge,
 	}
 	a.cfg.Programs = append(a.cfg.Programs, p)
 	a.cfg.SyncProgramDesktop()
@@ -306,7 +319,11 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 	}
 
 	drawField(2, "Desk name: ", a.name, 0)
-	drawField(3, "Command:   ", a.command, 1)
+	cmdLabel := "Command:   "
+	if a.bridge {
+		cmdLabel = "X11 app:   "
+	}
+	drawField(3, cmdLabel, a.command, 1)
 
 	f, b := fg, bg
 	if a.field == 2 {
@@ -334,8 +351,18 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 	}
 	cv.DrawText(1, 6, desk+" Add desktop shortcut", f, b, 0)
 
-	cv.DrawButton(1, 8, 12, "Save", fg, cell.RGB(0x00, 0xAA, 0x00), a.field == 5)
-	cv.DrawButton(15, 8, 12, "Cancel", fg, cell.RGB(0xAA, 0xAA, 0xAA), a.field == 6)
+	f, b = fg, bg
+	if a.field == 5 {
+		f, b = cell.RGB(0xFF, 0xFF, 0xFF), hi
+	}
+	bridgeBox := "[ ]"
+	if a.bridge {
+		bridgeBox = "[X]"
+	}
+	cv.DrawText(1, 7, bridgeBox+" Launch via GUI-TUI Bridge (real X11 app, e.g. firefox, gimp)", f, b, 0)
+
+	cv.DrawButton(1, 9, 12, "Save", fg, cell.RGB(0x00, 0xAA, 0x00), a.field == 6)
+	cv.DrawButton(15, 9, 12, "Cancel", fg, cell.RGB(0xAA, 0xAA, 0xAA), a.field == 7)
 
 	if a.dropOpen {
 		a.drawDropdown(cv, cols, rows, hi, fg)

@@ -63,7 +63,18 @@ default; any source you add by hand gets the warning once.
       "detect": { "which": "carbonyl", "paths": ["~/.local/bin/carbonyl"] },
       "install": { "script": "install/carbonyl.sh" },
       "register": [
-        { "id": "carbonyl", "name": "Internet", "command": "pty:carbonyl", "icon": "🌐", "menu": "programs" }
+        { "id": "carbonyl", "name": "Internet", "command": "carbonyl", "icon": "🌐", "menu": "programs" }
+      ]
+    },
+    {
+      "id": "gimp",
+      "name": "GIMP",
+      "description": "Image editor, bridged in as a real X11 app",
+      "icon": "🎨",
+      "detect": { "which": "gimp" },
+      "install": { "script": "install/gimp.sh" },
+      "register": [
+        { "id": "gimp", "name": "GIMP", "command": "gimp", "icon": "🎨", "menu": "programs", "bridge": true }
       ]
     }
   ]
@@ -82,6 +93,15 @@ default; any source you add by hand gets the warning once.
   existing program just because they share a display Name — if `name` is
   already in use by an unrelated program, it's suffixed `-store` (then
   `-store-2`, …) so both coexist in the Start menu.
+- `register[].command` is always a plain command name/line — `"carbonyl"`,
+  not `"pty:carbonyl"`. There's no launch-action prefix syntax here; every
+  registered program runs as `$SHELL -c "<command>"` in a PTY window unless
+  `bridge` is set (see next).
+- `register[].bridge: true` launches `command` through the GUI-TUI Bridge
+  (a real X11 app, half-block rendered — see [gui-bridge.md](gui-bridge.md))
+  instead of a shell PTY. Use this for entries that are themselves GUI
+  applications, the same as ticking "Launch via GUI-TUI Bridge" in Add
+  Program does for a hand-registered one.
 
 ## Replacing a default app (`set_role`)
 

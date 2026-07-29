@@ -6,14 +6,17 @@ const (
 	MenuSystem   = "system"
 )
 
-// Program is a user-registered app (usually a shell command in a PTY window).
+// Program is a user-registered app: usually a shell command run in a PTY
+// window, or — if Bridge is set — an X11 GUI app launched through the
+// GUI-TUI Bridge (see internal/bridge) instead.
 type Program struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`    // display name in TTYPE Desk (e.g. "Task Manager")
-	Command string `json:"command"` // run via $SHELL -c (e.g. "htop")
+	Command string `json:"command"` // run via $SHELL -c (e.g. "htop"), or the X11 command if Bridge
 	Icon    string `json:"icon"`
-	Menu    string `json:"menu"`    // programs | system
-	Desktop bool   `json:"desktop"` // keep a desktop shortcut in sync
+	Menu    string `json:"menu"`             // programs | system
+	Desktop bool   `json:"desktop"`          // keep a desktop shortcut in sync
+	Bridge  bool   `json:"bridge,omitempty"` // launch Command via the GUI-TUI Bridge, not a shell PTY
 }
 
 // MenuFolder returns programs or system (default programs).

@@ -414,18 +414,42 @@ func (s *Server) CreateProgram(p config.Program) (*Window, error) {
 }
 
 // launchProgramWithArg is CreateProgram plus an optional trailing argument
-// (shell-quoted), used to hand a path to an external file manager.
+// (shell-quoted), used to hand a path to an external file manager. extraArg
+// is ignored for a Bridge program — there's no file-manager use case for
+// handing a bridged GUI app a trailing path argument today.
 func (s *Server) launchProgramWithArg(p config.Program, extraArg string) (*Window, error) {
-	shell := s.cfg.Shell
 	name := p.Name
 	if name == "" {
 		name = p.Command
 	}
+	if p.Bridge {
+		return s.createBridgeProgram(config.ProgramAction(p.ID), name, p.Command)
+	}
+	shell := s.cfg.Shell
 	cmd := p.Command
 	if extraArg != "" {
 		cmd = cmd + " " + shellQuote(extraArg)
 	}
 	return s.createPty(config.ProgramAction(p.ID), name, shell, []string{"-c", cmd}, true)
+}
+
+// createBridgeProgram opens a registered Bridge-backed program (Add
+// Program's "Launch via GUI-TUI Bridge" checkbox) with a pinned prog:
+// launch key — same reasoning as createPty's pinTitle=true for shell
+// programs: BridgeSurface.Title() always returns the raw command, so
+// without pinning, RefreshTitles would silently overwrite the friendly
+// display name back to the command string on the very next tick.
+func (s *Server) createBridgeProgram(launch, title, command string) (*Window, error) {
+	s.mu.Lock()
+	win, err := s.createLocked("bridge", title, "", "", command, nil, true)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	win.Launch = launch
+	s.mu.Unlock()
+	return win, nil
 }
 
 // shellQuote wraps s in single quotes for safe embedding in a `sh -c` command line.
