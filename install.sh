@@ -20,6 +20,17 @@ if [ "$(uname -s)" != "Linux" ]; then
   exit 1
 fi
 
+# Root (common in minimal containers/servers) has no sudo binary at all —
+# don't assume one exists just because we're not already privileged. Shared
+# by every "install missing system packages" block below.
+SUDO=""
+if [ "$(id -u)" != "0" ]; then
+  if command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+    echo "-- Installing system packages runs as normal commands in this window, so you'll be prompted for your sudo password right here if any are needed. --"
+  fi
+fi
+
 # ---- build dependencies (git, gcc, ar) ----
 have_build_tools() {
   command -v git >/dev/null 2>&1 && command -v gcc >/dev/null 2>&1 && command -v ar >/dev/null 2>&1
@@ -27,17 +38,9 @@ have_build_tools() {
 
 if ! have_build_tools; then
   echo "-- Installing build dependencies (git, gcc, binutils) --"
-  # Root (common in minimal containers/servers) has no sudo binary at all —
-  # don't assume one exists just because we're not already privileged.
-  SUDO=""
-  if [ "$(id -u)" != "0" ]; then
-    if command -v sudo >/dev/null 2>&1; then
-      SUDO="sudo"
-      echo "-- This runs as a normal command in this window, so you'll be prompted for your sudo password right here if it's needed. --"
-    else
-      echo "ERROR: not running as root and 'sudo' isn't available — install git, gcc, and binutils yourself (or re-run as root), then re-run this script."
-      exit 1
-    fi
+  if [ "$(id -u)" != "0" ] && [ -z "$SUDO" ]; then
+    echo "ERROR: not running as root and 'sudo' isn't available — install git, gcc, and binutils yourself (or re-run as root), then re-run this script."
+    exit 1
   fi
   if command -v apt-get >/dev/null 2>&1; then
     $SUDO apt-get update && $SUDO apt-get install -y git gcc make binutils ca-certificates curl
@@ -60,6 +63,46 @@ if ! have_build_tools; then
   exit 1
 fi
 echo "-- Build tools OK: $(command -v git), $(command -v gcc), $(command -v ar) --"
+
+# ---- audio build dependencies (pkg-config + ALSA dev headers) ----
+# internal/audio pulls in github.com/ebitengine/oto/v3, which cgo-links
+# against ALSA on Linux at build time — distinct from PulseAudio/pipewire
+# being installed at runtime for internal/audiocap's Settings -> Audio
+# streaming feature. Missing this produces a build failure of the form
+# `exec: "pkg-config": executable file not found in $PATH` (or, with
+# pkg-config present but no ALSA dev headers, "Package alsa was not
+# found in the pkg-config search path").
+have_audio_build_deps() {
+  command -v pkg-config >/dev/null 2>&1 && pkg-config --exists alsa 2>/dev/null
+}
+
+if ! have_audio_build_deps; then
+  echo "-- Installing audio build dependencies (pkg-config, ALSA dev headers) --"
+  if [ "$(id -u)" != "0" ] && [ -z "$SUDO" ]; then
+    echo "ERROR: not running as root and 'sudo' isn't available — install pkg-config and ALSA development headers yourself (e.g. libasound2-dev on Debian/Ubuntu), then re-run this script."
+    exit 1
+  fi
+  if command -v apt-get >/dev/null 2>&1; then
+    $SUDO apt-get update && $SUDO apt-get install -y pkg-config libasound2-dev
+  elif command -v dnf >/dev/null 2>&1; then
+    $SUDO dnf install -y pkgconf-pkg-config alsa-lib-devel
+  elif command -v pacman >/dev/null 2>&1; then
+    $SUDO pacman -Sy --noconfirm pkgconf alsa-lib
+  elif command -v zypper >/dev/null 2>&1; then
+    $SUDO zypper install -y pkg-config alsa-devel
+  elif command -v apk >/dev/null 2>&1; then
+    $SUDO apk add pkgconf alsa-lib-dev
+  else
+    echo "WARN: no known package manager found (looked for apt-get/dnf/pacman/zypper/apk)."
+    echo "WARN: install pkg-config and ALSA development headers yourself, then re-run this script."
+  fi
+fi
+
+if ! have_audio_build_deps; then
+  echo "ERROR: pkg-config/ALSA dev headers still missing after attempted install. Install them manually (e.g. 'sudo apt install pkg-config libasound2-dev') and re-run."
+  exit 1
+fi
+echo "-- Audio build deps OK: $(command -v pkg-config) --"
 
 # ---- Go toolchain (per-user, no sudo — go.mod's toolchain directive will
 # auto-fetch the exact pinned version over the network as needed, this just
