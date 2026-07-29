@@ -197,6 +197,8 @@ func (h *recordingHost) LoadCredential(string) ([]byte, error) {
 }
 func (h *recordingHost) PickFile(string, []string, func(string, bool))         {}
 func (h *recordingHost) PlayAudio(<-chan []int16) (uiapp.AudioPlayback, error) { return nil, nil }
+func (h *recordingHost) ClipboardGet() string                                  { return "" }
+func (h *recordingHost) ClipboardSet(string)                                   {}
 
 var errNotExistFixture = fixtureErr("not found")
 

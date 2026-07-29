@@ -30,16 +30,18 @@ type ExtAppSurface struct {
 	writeMu sync.Mutex // guards stdin writes only, never taken together with mu
 	stdinW  io.WriteCloser
 
-	mu       sync.Mutex
-	cols     int
-	rows     int
-	title    string
-	host     uiapp.Host
-	cells    []cell.Cell
-	closed   bool
-	crashed  bool
-	crashMsg string
-	dirty    atomic.Bool
+	mu            sync.Mutex
+	cols          int
+	rows          int
+	title         string
+	host          uiapp.Host
+	cells         []cell.Cell
+	closed        bool
+	crashed       bool
+	crashMsg      string
+	dirty         atomic.Bool
+	audioPCM      chan []int16 // non-nil while a play_audio stream is active
+	audioPlayback uiapp.AudioPlayback
 
 	msgCh    chan proto.Envelope // decoded messages from the child, drained under mu in ProduceDiff
 	stopCh   chan struct{}
@@ -100,7 +102,13 @@ func (s *ExtAppSurface) BindHost(host uiapp.Host) error {
 }
 
 func (s *ExtAppSurface) writeEnvelope(typ proto.MessageType, payload any) error {
-	data, err := proto.Encode(typ, s.id, payload)
+	return s.writeEnvelopeReq(typ, "", payload)
+}
+
+// writeEnvelopeReq is writeEnvelope with a ReqID, for replying to a
+// request/response message (credential/pick_file/clipboard_get).
+func (s *ExtAppSurface) writeEnvelopeReq(typ proto.MessageType, reqID string, payload any) error {
+	data, err := proto.EncodeReq(typ, s.id, reqID, payload)
 	if err != nil {
 		return err
 	}
@@ -109,6 +117,16 @@ func (s *ExtAppSurface) writeEnvelope(typ proto.MessageType, payload any) error 
 	defer s.writeMu.Unlock()
 	_, err = s.stdinW.Write(data)
 	return err
+}
+
+// audioChan returns the active play_audio stream's channel, or nil —
+// read under mu (a cheap pointer read, not the potentially-blocking send
+// itself) so readLoop's fast audio path never needs to touch mu for the
+// send.
+func (s *ExtAppSurface) audioChan() chan []int16 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.audioPCM
 }
 
 // readLoop decodes NDJSON envelopes from the child's stdout and hands
@@ -124,6 +142,27 @@ func (s *ExtAppSurface) readLoop(stdout io.Reader) {
 		env, err := proto.Decode(sc.Bytes())
 		if err != nil {
 			continue // one malformed line isn't worth crashing the window over
+		}
+		// audio_chunk bypasses msgCh/ProduceDiff entirely: internal/audio's
+		// Playback uses a slow consumer blocking its feeder as backpressure
+		// (see internal/audio.Play's doc comment) — exactly right for a
+		// local decode like this one, but ProduceDiff runs on the client's
+		// shared per-frame render loop, so blocking *there* waiting for
+		// audio to drain would stall every other window's redraw too. This
+		// keeps that blocking entirely on this surface's own goroutine.
+		if env.Type == proto.TypeAudioChunk {
+			p, err := proto.DecodePayload[proto.AudioChunkPayload](env)
+			if err != nil {
+				continue
+			}
+			if ch := s.audioChan(); ch != nil {
+				select {
+				case ch <- proto.DecodeAudioChunk(p.PCM):
+				case <-s.stopCh:
+					return
+				}
+			}
+			continue
 		}
 		select {
 		case s.msgCh <- env:
@@ -299,7 +338,85 @@ func (s *ExtAppSurface) applyLocked(env proto.Envelope, host uiapp.Host) {
 		if host != nil {
 			go host.RequestClose()
 		}
+	case proto.TypeSaveCredential:
+		p, err := proto.DecodePayload[proto.SaveCredentialRequest](env)
+		if err != nil || host == nil {
+			return
+		}
+		errStr := ""
+		if err := host.SaveCredential(p.Key, p.Value); err != nil {
+			errStr = err.Error()
+		}
+		_ = s.writeEnvelopeReq(proto.TypeCredentialSaved, env.ReqID, proto.CredentialSavedResponse{Err: errStr})
+	case proto.TypeLoadCredential:
+		p, err := proto.DecodePayload[proto.LoadCredentialRequest](env)
+		if err != nil || host == nil {
+			return
+		}
+		value, loadErr := host.LoadCredential(p.Key)
+		errStr := ""
+		if loadErr != nil {
+			errStr = loadErr.Error()
+		}
+		_ = s.writeEnvelopeReq(proto.TypeCredentialLoaded, env.ReqID, proto.CredentialLoadedResponse{Value: value, Err: errStr})
+	case proto.TypePickFile:
+		p, err := proto.DecodePayload[proto.PickFileRequest](env)
+		if err != nil || host == nil {
+			return
+		}
+		reqID := env.ReqID
+		// onResult fires later, asynchronously, from whatever unrelated
+		// call stack actually handles the picker window's own UI — never
+		// synchronously from here, so writing the reply (writeMu only,
+		// never this surface's mu) is always safe regardless of when it
+		// runs.
+		host.PickFile(p.StartDir, p.Extensions, func(path string, ok bool) {
+			_ = s.writeEnvelopeReq(proto.TypeFilePicked, reqID, proto.FilePickedResponse{Path: path, Ok: ok})
+		})
+	case proto.TypeClipboardGet:
+		if host == nil {
+			return
+		}
+		_ = s.writeEnvelopeReq(proto.TypeClipboardValue, env.ReqID, proto.ClipboardValueResponse{Text: host.ClipboardGet()})
+	case proto.TypeClipboardSet:
+		p, err := proto.DecodePayload[proto.ClipboardSetRequest](env)
+		if err != nil || host == nil {
+			return
+		}
+		host.ClipboardSet(p.Text)
+	case proto.TypePlayAudio:
+		if host == nil || s.audioPCM != nil {
+			return // already playing — a second play_audio without an
+			// intervening stop_audio is treated as a no-op rather than
+			// silently swapping streams under the child's feet.
+		}
+		pcm := make(chan []int16, 8)
+		pb, err := host.PlayAudio(pcm)
+		if err != nil {
+			slog.Warn("extapp id=%s PlayAudio failed: %v", s.id, err)
+			return
+		}
+		s.audioPCM = pcm
+		s.audioPlayback = pb
+	case proto.TypeStopAudio:
+		s.stopAudioLocked()
 	}
+}
+
+// stopAudioLocked tears down the active play_audio stream, if any. Must be
+// called with mu held. Deliberately doesn't close audioPCM: readLoop's
+// audio fast path (audioChan/send) runs on its own goroutine outside this
+// lock, so closing a channel it might still be sending to would risk a
+// "send on closed channel" panic. Dropping the reference (audioPCM = nil)
+// is enough — audioChan() will return nil for any future chunk, and the
+// old channel is simply abandoned to the garbage collector once nothing
+// references it anymore.
+func (s *ExtAppSurface) stopAudioLocked() {
+	if s.audioPlayback != nil {
+		s.audioPlayback.Stop()
+	}
+	s.audioPlayback = nil
+	s.audioPCM = nil
 }
 
 func (s *ExtAppSurface) drawCrashLocked() cell.Diff {
@@ -356,6 +473,7 @@ func (s *ExtAppSurface) Close() error {
 		return nil
 	}
 	s.closed = true
+	s.stopAudioLocked()
 	s.mu.Unlock()
 	s.stopOnce.Do(func() { close(s.stopCh) })
 

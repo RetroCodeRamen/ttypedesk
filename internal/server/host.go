@@ -2,6 +2,7 @@ package server
 
 import (
 	"github.com/ttypedesk/ttypedesk/internal/audio"
+	"github.com/ttypedesk/ttypedesk/internal/clip"
 	"github.com/ttypedesk/ttypedesk/internal/credstore"
 	"github.com/ttypedesk/ttypedesk/internal/slog"
 	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
@@ -57,5 +58,8 @@ func (h *appHost) PickFile(startDir string, extensions []string, onResult func(p
 func (h *appHost) PlayAudio(pcm <-chan []int16) (uiapp.AudioPlayback, error) {
 	return audio.Play(pcm)
 }
+
+func (h *appHost) ClipboardGet() string     { return clip.Get() }
+func (h *appHost) ClipboardSet(text string) { clip.Set(text) }
 
 var _ uiapp.Host = (*appHost)(nil)

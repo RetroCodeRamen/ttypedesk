@@ -27,6 +27,11 @@ on stdin (host → app) and stdout (app → host).
 
 - `v` — protocol version (currently always `1`).
 - `type` — message type, see below.
+- `req_id` — present only on request/response message pairs (credentials,
+  the file picker, clipboard reads — see below). The app sets it when
+  sending the request; the host echoes it back unchanged on the matching
+  reply, so several in-flight requests don't need to resolve in send
+  order. Omitted (or ignore it) for every other message type.
 - `payload` — type-specific, may be omitted for types that carry none.
 
 Write one compact JSON object per line, `\n`-terminated, flushed
@@ -62,6 +67,52 @@ logging).
 
 `cell` matches `pkg/cell.Cell`: `{"rune": 65, "fg": {"r":255,"g":255,"b":255}, "bg": {"r":0,"g":0,"b":128}, "attr": 0}` — `rune` is a Unicode code point (not a UTF-8 byte), colors are 24-bit RGB, `attr` is a bitmask (bit 0 = bold, 1 = underline, 2 = italic, 3 = blink, 4 = reverse, 5 = strike — see `pkg/cell.Attr`).
 
+### Credentials, file picker, clipboard (request/response)
+
+These are request/response pairs — set `req_id` on the request (any string
+unique among your own in-flight requests; the host never interprets it,
+just echoes it back), match it against the reply's `req_id`.
+
+| App → host | Payload | Host → app reply | Reply payload |
+|---|---|---|---|
+| `save_credential` | `{key, value}` | `credential_saved` | `{err?}` |
+| `load_credential` | `{key}` | `credential_loaded` | `{value?, err?}` |
+| `pick_file` | `{start_dir?, extensions?}` | `file_picked` | `{path?, ok}` |
+| `clipboard_get` | *(none)* | `clipboard_value` | `{text}` |
+
+`value` (in both credential messages) and `bytes`/PCM fields elsewhere are
+always base64 strings on the wire — this is just how every `[]byte` Go
+field here gets encoded (`encoding/json`'s default), not a special case
+you need to handle differently.
+
+`load_credential`'s `err` is set (and `value` meaningless) when nothing's
+been saved under `key` yet — expect this on first run, not just on a real
+failure.
+
+`file_picked` doesn't necessarily arrive quickly — it fires whenever the
+user actually interacts with the picker window the host opened, which
+could be much later than the request (or never, if they just leave it
+open — though they can't; picking or Esc/Cancel are the only ways out).
+`ok: false` means cancelled, `path` is meaningless.
+
+### Clipboard write (fire-and-forget)
+
+| Type | Payload | Meaning |
+|---|---|---|
+| `clipboard_set` | `{text}` | Write the shared system clipboard (`uiapp.Host.ClipboardSet`). No reply — nothing meaningful can fail. |
+
+### Audio playback (fire-and-forget)
+
+Not request/response — `play_audio` starts a stream, repeated
+`audio_chunk` messages carry PCM, `stop_audio` ends it. No reply to any
+of these.
+
+| Type | Payload | Meaning |
+|---|---|---|
+| `play_audio` | *(none)* | Start streaming to the shared audio output (`uiapp.Host.PlayAudio`). A second `play_audio` before a `stop_audio` is ignored, not a stream swap. |
+| `audio_chunk` | `{pcm}` | One chunk of interleaved 16-bit signed little-endian PCM samples, base64-encoded, at the fixed 48kHz/stereo `internal/audio` uses — decode to that rate/channel count, there's no per-call resampling. Send at roughly real-time pace (don't blast the whole track as fast as possible) — see `cmd/extapp-hello`'s `streamSineTone` for a minimal real example, including the exact byte layout via `internal/proto.EncodeAudioChunk`. |
+| `stop_audio` | *(none)* | Stop the stream. |
+
 ## Lifecycle
 
 1. Host spawns the process and sends `init`.
@@ -82,12 +133,11 @@ logging).
 - **Partial diffs.** Every `screen_diff` must be a full-grid redraw (see
   above). Fine for typical text-UI sizes; revisit if a real app finds
   full redraws too expensive.
-- **`SaveCredential`/`LoadCredential`, `PickFile`, `PlayAudio`.** These
-  exist on `uiapp.Host` for in-process apps but have no wire message yet.
-  An out-of-process app that needs credential storage, a file picker, or
-  audio playback isn't covered by v1 — add the corresponding message type
-  when a real app needs it, rather than speculatively now.
 - **Periodic timer ticks.** There's no `timer` message — a `screen_diff`
   can be sent at any time regardless of host messages, so an app wanting
   to animate independently just runs its own ticker and pushes redraws
   on its own schedule (see `cmd/extapp-hello`'s clock for exactly this).
+
+As of the request/response messages above, out-of-process apps have full
+parity with `uiapp.Host` — credentials, the file picker, clipboard, and
+audio playback are all covered, the same as in-process apps get.

@@ -65,6 +65,12 @@ type Host interface {
 	// internal/audio.SampleRate/Channels — decode to that rate/channel
 	// count, there is no per-call resampling) to the shared audio output.
 	PlayAudio(pcm <-chan []int16) (AudioPlayback, error)
+
+	// ClipboardGet/ClipboardSet read/write the shared system clipboard
+	// (internal/clip — OSC 52 plus wl-copy/xclip/xsel where available).
+	// ClipboardGet returns "" if nothing's there yet.
+	ClipboardGet() string
+	ClipboardSet(text string)
 }
 
 // Event kinds.
@@ -233,6 +239,21 @@ func (c *Context) PlayAudio(pcm <-chan []int16) (AudioPlayback, error) {
 		return h.PlayAudio(pcm)
 	}
 	return noopPlayback{}, nil
+}
+
+// ClipboardGet reads the shared system clipboard; see Host.ClipboardGet.
+func (c *Context) ClipboardGet() string {
+	if h := c.Host(); h != nil {
+		return h.ClipboardGet()
+	}
+	return ""
+}
+
+// ClipboardSet writes the shared system clipboard; see Host.ClipboardSet.
+func (c *Context) ClipboardSet(text string) {
+	if h := c.Host(); h != nil {
+		h.ClipboardSet(text)
+	}
 }
 
 type noopPlayback struct{}

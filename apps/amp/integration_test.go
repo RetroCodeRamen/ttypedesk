@@ -28,6 +28,8 @@ func (fakeHost) PickFile(string, []string, func(string, bool)) {}
 func (fakeHost) PlayAudio(pcm <-chan []int16) (uiapp.AudioPlayback, error) {
 	return audio.Play(pcm)
 }
+func (fakeHost) ClipboardGet() string { return "" }
+func (fakeHost) ClipboardSet(string)  {}
 
 // failingAudioHost is fakeHost but PlayAudio always errors — for testing
 // playAt's own error-recovery path without needing to actually break real

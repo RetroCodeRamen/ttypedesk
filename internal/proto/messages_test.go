@@ -74,6 +74,118 @@ func TestOpenPathPayloadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestEncodeReqRoundTripsReqID(t *testing.T) {
+	data, err := EncodeReq(TypeLoadCredential, "win1", "r7", LoadCredentialRequest{Key: "k"})
+	if err != nil {
+		t.Fatalf("EncodeReq: %v", err)
+	}
+	env, err := Decode(data)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if env.ReqID != "r7" {
+		t.Fatalf("ReqID = %q, want %q", env.ReqID, "r7")
+	}
+	p, err := DecodePayload[LoadCredentialRequest](env)
+	if err != nil {
+		t.Fatalf("DecodePayload: %v", err)
+	}
+	if p.Key != "k" {
+		t.Fatalf("Key = %q, want %q", p.Key, "k")
+	}
+}
+
+func TestEncodeLeavesReqIDEmpty(t *testing.T) {
+	data, err := Encode(TypeNotify, "win1", NotifyPayload{Title: "t"})
+	if err != nil {
+		t.Fatalf("Encode: %v", err)
+	}
+	env, err := Decode(data)
+	if err != nil {
+		t.Fatalf("Decode: %v", err)
+	}
+	if env.ReqID != "" {
+		t.Fatalf("ReqID = %q, want empty for a fire-and-forget Encode", env.ReqID)
+	}
+}
+
+func TestSaveCredentialRequestRoundTrip(t *testing.T) {
+	want := SaveCredentialRequest{Key: "tok", Value: []byte{0x00, 0xFF, 0x10}}
+	got := roundTrip(t, TypeSaveCredential, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("SaveCredentialRequest round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestCredentialSavedResponseRoundTrip(t *testing.T) {
+	want := CredentialSavedResponse{Err: "disk full"}
+	got := roundTrip(t, TypeCredentialSaved, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("CredentialSavedResponse round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestLoadCredentialRequestRoundTrip(t *testing.T) {
+	want := LoadCredentialRequest{Key: "tok"}
+	got := roundTrip(t, TypeLoadCredential, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("LoadCredentialRequest round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestCredentialLoadedResponseRoundTrip(t *testing.T) {
+	want := CredentialLoadedResponse{Value: []byte("secret")}
+	got := roundTrip(t, TypeCredentialLoaded, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("CredentialLoadedResponse round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestPickFileRequestRoundTrip(t *testing.T) {
+	want := PickFileRequest{StartDir: "/home/x", Extensions: []string{"png", "jpg"}}
+	got := roundTrip(t, TypePickFile, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("PickFileRequest round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestFilePickedResponseRoundTrip(t *testing.T) {
+	want := FilePickedResponse{Path: "/home/x/a.png", Ok: true}
+	got := roundTrip(t, TypeFilePicked, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("FilePickedResponse round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestClipboardValueResponseRoundTrip(t *testing.T) {
+	want := ClipboardValueResponse{Text: "clipped"}
+	got := roundTrip(t, TypeClipboardValue, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("ClipboardValueResponse round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestClipboardSetRequestRoundTrip(t *testing.T) {
+	want := ClipboardSetRequest{Text: "new clip"}
+	got := roundTrip(t, TypeClipboardSet, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("ClipboardSetRequest round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestAudioChunkPayloadRoundTrip(t *testing.T) {
+	samples := []int16{0, 1, -1, 32767, -32768}
+	want := AudioChunkPayload{PCM: EncodeAudioChunk(samples)}
+	got := roundTrip(t, TypeAudioChunk, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("AudioChunkPayload round-trip mismatch: want %+v, got %+v", want, got)
+	}
+	gotSamples := DecodeAudioChunk(got.PCM)
+	if !reflect.DeepEqual(samples, gotSamples) {
+		t.Fatalf("DecodeAudioChunk(got.PCM) = %v, want %v", gotSamples, samples)
+	}
+}
+
 func TestSnapshotWindowRoundTrip(t *testing.T) {
 	want := Snapshot{
 		Cols: 80,

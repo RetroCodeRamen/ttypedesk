@@ -9,6 +9,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"sync"
 	"time"
@@ -18,10 +19,15 @@ import (
 )
 
 func main() {
-	var mu sync.Mutex // guards cols/rows/clicks/windowID and drawLocked's send
+	var mu sync.Mutex // guards all state below and drawLocked's send
 	cols, rows := 40, 12
 	windowID := ""
 	clicks := 0
+	credStatus := "press c"
+	clipStatus := "press v"
+	pickStatus := "press f"
+	audioOn := false
+	var audioStop chan struct{}
 
 	out := bufio.NewWriter(os.Stdout)
 	var outMu sync.Mutex
@@ -37,8 +43,42 @@ func main() {
 		outMu.Unlock()
 	}
 
-	// drawLocked must be called with mu held — it reads cols/rows/clicks
-	// and sends the result, so callers on different goroutines (the
+	// pending correlates a request/response pair (credential save/load,
+	// clipboard get, file picker) by the ReqID sendReq generates — the
+	// reply arrives on the same NDJSON reader as everything else, tagged
+	// with that ID, matched and removed when it lands. Only ever touched
+	// from the main loop below, which already holds mu throughout, so no
+	// separate lock.
+	pending := map[string]func(proto.Envelope){}
+	reqSeq := 0
+	sendReq := func(typ proto.MessageType, payload any, onReply func(proto.Envelope)) {
+		reqSeq++
+		id := fmt.Sprintf("r%d", reqSeq)
+		if onReply != nil {
+			pending[id] = onReply
+		}
+		data, err := proto.EncodeReq(typ, windowID, id, payload)
+		if err != nil {
+			return
+		}
+		outMu.Lock()
+		_, _ = out.Write(data)
+		_ = out.WriteByte('\n')
+		_ = out.Flush()
+		outMu.Unlock()
+	}
+	dispatchReply := func(env proto.Envelope) {
+		if env.ReqID == "" {
+			return
+		}
+		if fn := pending[env.ReqID]; fn != nil {
+			delete(pending, env.ReqID)
+			fn(env)
+		}
+	}
+
+	// drawLocked must be called with mu held — it reads all the state
+	// above and sends the result, so callers on different goroutines (the
 	// ticker below and the main NDJSON-reading loop) can't be allowed to
 	// interleave their reads of that state with each other's writes.
 	drawLocked := func() {
@@ -61,6 +101,14 @@ func main() {
 		put(1, 3, "Out-of-process App SDK demo")
 		put(1, 5, fmt.Sprintf("Clicks: %d", clicks))
 		put(1, 6, time.Now().Format("15:04:05"))
+		put(1, 8, "Cred  (c): "+credStatus)
+		put(1, 9, "Clip  (v): "+clipStatus)
+		put(1, 10, "Pick  (f): "+pickStatus)
+		audioLabel := "off"
+		if audioOn {
+			audioLabel = "on — streaming a 440Hz tone"
+		}
+		put(1, 11, "Audio (a): "+audioLabel)
 		if rows > 2 {
 			put(1, rows-2, "q or Esc closes this window")
 		}
@@ -113,11 +161,70 @@ func main() {
 			drawLocked()
 		case proto.TypeKey:
 			p, _ := proto.DecodePayload[proto.KeyEvent](env)
-			if p.Key == "Escape" || p.Rune == 'q' || p.Rune == 'Q' {
+			switch {
+			case p.Key == "Escape" || p.Rune == 'q' || p.Rune == 'Q':
 				mu.Unlock()
 				send(proto.TypeCloseWindow, nil)
 				mu.Lock()
-			} else {
+			case p.Rune == 'c' || p.Rune == 'C':
+				credStatus = "saving..."
+				drawLocked()
+				sendReq(proto.TypeSaveCredential,
+					proto.SaveCredentialRequest{Key: "extapp-hello-demo", Value: []byte("hello from extapp-hello")},
+					func(reply proto.Envelope) {
+						r, _ := proto.DecodePayload[proto.CredentialSavedResponse](reply)
+						if r.Err != "" {
+							credStatus = "save failed: " + r.Err
+							drawLocked()
+							return
+						}
+						credStatus = "saved, loading back..."
+						drawLocked()
+						sendReq(proto.TypeLoadCredential, proto.LoadCredentialRequest{Key: "extapp-hello-demo"},
+							func(reply2 proto.Envelope) {
+								r2, _ := proto.DecodePayload[proto.CredentialLoadedResponse](reply2)
+								if r2.Err != "" {
+									credStatus = "load failed: " + r2.Err
+								} else {
+									credStatus = "round-trip OK: " + string(r2.Value)
+								}
+								drawLocked()
+							})
+					})
+			case p.Rune == 'v' || p.Rune == 'V':
+				clipStatus = "setting..."
+				drawLocked()
+				send(proto.TypeClipboardSet, proto.ClipboardSetRequest{Text: "hello from extapp-hello"})
+				sendReq(proto.TypeClipboardGet, nil, func(reply proto.Envelope) {
+					r, _ := proto.DecodePayload[proto.ClipboardValueResponse](reply)
+					clipStatus = "now: " + r.Text
+					drawLocked()
+				})
+			case p.Rune == 'f' || p.Rune == 'F':
+				pickStatus = "picking..."
+				drawLocked()
+				sendReq(proto.TypePickFile, proto.PickFileRequest{StartDir: "/tmp"}, func(reply proto.Envelope) {
+					r, _ := proto.DecodePayload[proto.FilePickedResponse](reply)
+					if r.Ok {
+						pickStatus = "picked: " + r.Path
+					} else {
+						pickStatus = "cancelled"
+					}
+					drawLocked()
+				})
+			case p.Rune == 'a' || p.Rune == 'A':
+				if audioOn {
+					close(audioStop)
+					audioOn = false
+					send(proto.TypeStopAudio, nil)
+				} else {
+					audioOn = true
+					audioStop = make(chan struct{})
+					send(proto.TypePlayAudio, nil)
+					go streamSineTone(audioStop, send)
+				}
+				drawLocked()
+			default:
 				drawLocked()
 			}
 		case proto.TypeMouse:
@@ -126,9 +233,41 @@ func main() {
 				clicks++
 				drawLocked()
 			}
+		case proto.TypeCredentialSaved, proto.TypeCredentialLoaded, proto.TypeFilePicked, proto.TypeClipboardValue:
+			dispatchReply(env)
 		}
 		mu.Unlock()
 	}
 	// Stdin closed (the host closes it as the first step of tearing down
 	// this window) — exit cleanly rather than waiting to be killed.
+}
+
+// streamSineTone generates a continuous 440Hz tone and streams it as
+// audio_chunk messages, paced to roughly real-time so the host's playback
+// buffer never gets flooded — until stop is closed. send is safe to call
+// from any goroutine (see main's outMu).
+func streamSineTone(stop <-chan struct{}, send func(proto.MessageType, any)) {
+	const sampleRate = 48000
+	const channels = 2
+	const chunkFrames = 1024
+	phase := 0.0
+	step := 2 * math.Pi * 440 / float64(sampleRate)
+	t := time.NewTicker(chunkFrames * time.Second / sampleRate)
+	defer t.Stop()
+	for {
+		select {
+		case <-stop:
+			return
+		case <-t.C:
+		}
+		buf := make([]int16, chunkFrames*channels)
+		for i := 0; i < chunkFrames; i++ {
+			v := int16(math.Sin(phase) * 8000) // modest volume, not full-scale
+			phase += step
+			for c := 0; c < channels; c++ {
+				buf[i*channels+c] = v
+			}
+		}
+		send(proto.TypeAudioChunk, proto.AudioChunkPayload{PCM: proto.EncodeAudioChunk(buf)})
+	}
 }

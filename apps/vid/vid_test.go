@@ -68,6 +68,8 @@ func (fakeHost) PickFile(string, []string, func(string, bool)) {}
 func (fakeHost) PlayAudio(pcm <-chan []int16) (uiapp.AudioPlayback, error) {
 	return audio.Play(pcm)
 }
+func (fakeHost) ClipboardGet() string { return "" }
+func (fakeHost) ClipboardSet(string)  {}
 
 func newTestApp(t *testing.T) (*App, *uiapp.Context) {
 	t.Helper()

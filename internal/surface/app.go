@@ -166,6 +166,9 @@ func (b *hostBridge) PlayAudio(pcm <-chan []int16) (uiapp.AudioPlayback, error) 
 	return b.inner.PlayAudio(pcm)
 }
 
+func (b *hostBridge) ClipboardGet() string     { return b.inner.ClipboardGet() }
+func (b *hostBridge) ClipboardSet(text string) { b.inner.ClipboardSet(text) }
+
 func (b *hostBridge) SetTitle(title string) {
 	// Never take AppSurface.mu — may be called from Handle/Draw while mu is held.
 	b.surf.titleMu.Lock()
