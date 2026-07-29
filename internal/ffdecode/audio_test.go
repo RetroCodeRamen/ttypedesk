@@ -130,3 +130,52 @@ func TestDecodeAudioStopUnblocksFeedGoroutine(t *testing.T) {
 		t.Fatal("feed goroutine did not exit after Stop() — PCM channel never closed")
 	}
 }
+
+func countSamples(t *testing.T, s *AudioStream, events chan AudioEvent) int {
+	t.Helper()
+	var n int
+	deadline := time.After(10 * time.Second)
+	for {
+		select {
+		case samples, ok := <-s.PCM:
+			if !ok {
+				return n
+			}
+			n += len(samples)
+		case ev := <-events:
+			if ev.Err != nil {
+				t.Fatalf("decode error: %v", ev.Err)
+			}
+			if ev.Ended {
+				return n
+			}
+		case <-deadline:
+			t.Fatal("timed out counting samples — ffmpeg pipeline likely stuck")
+		}
+	}
+}
+
+func TestDecodeAudioAtSeekSkipsContent(t *testing.T) {
+	requireFFmpeg(t)
+	path := synthTone(t, 4)
+
+	fullEvents := make(chan AudioEvent, 2)
+	full, err := DecodeAudioAt(path, 0, nil, fullEvents)
+	if err != nil {
+		t.Fatalf("DecodeAudioAt(seek=0): %v", err)
+	}
+	fullCount := countSamples(t, full, fullEvents)
+	full.Stop()
+
+	seekEvents := make(chan AudioEvent, 2)
+	seeked, err := DecodeAudioAt(path, 2*time.Second, nil, seekEvents)
+	if err != nil {
+		t.Fatalf("DecodeAudioAt(seek=2s): %v", err)
+	}
+	seekedCount := countSamples(t, seeked, seekEvents)
+	seeked.Stop()
+
+	if seekedCount >= fullCount {
+		t.Errorf("seeked decode produced %d samples, want fewer than the unseeked %d (seeking 2s into a 4s clip should skip roughly half of it)", seekedCount, fullCount)
+	}
+}

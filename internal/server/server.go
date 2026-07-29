@@ -21,6 +21,7 @@ import (
 	"github.com/ttypedesk/ttypedesk/apps/mgrprog"
 	"github.com/ttypedesk/ttypedesk/apps/notes"
 	"github.com/ttypedesk/ttypedesk/apps/settings"
+	"github.com/ttypedesk/ttypedesk/apps/vid"
 	"github.com/ttypedesk/ttypedesk/internal/bridge"
 	"github.com/ttypedesk/ttypedesk/internal/config"
 	"github.com/ttypedesk/ttypedesk/internal/notify"
@@ -272,6 +273,8 @@ func (s *Server) launchAction(action string) error {
 		return s.FocusOrCreateApp("appstore", "App Store")
 	case "amp":
 		return s.FocusOrCreateApp("amp", "Amp")
+	case "vid":
+		return s.FocusOrCreateApp("vid", "Vid")
 	default:
 		if len(action) > 5 && action[:5] == "open:" {
 			return s.OpenPath(action[5:])
@@ -694,6 +697,11 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 			cc, cr = w-2, h-2
 			surf, err = surface.NewAppSurface(id, "Amp", amp.New(), cc, cr)
 			title = "Amp"
+		case "vid":
+			w, h = 70, 24
+			cc, cr = w-2, h-2
+			surf, err = surface.NewAppSurface(id, "Vid", vid.New(), cc, cr)
+			title = "Vid"
 		case "filepicker":
 			w, h = 56, 18
 			cc, cr = w-2, h-2

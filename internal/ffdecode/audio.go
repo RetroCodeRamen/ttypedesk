@@ -12,6 +12,7 @@ import (
 	"io"
 	"os/exec"
 	"sync"
+	"time"
 )
 
 // SampleRate/Channels match internal/audio's fixed output format — decode
@@ -63,10 +64,19 @@ type AudioStream struct {
 // setting it post-construction would race that goroutine's first read of
 // it (confirmed by go test -race while writing this).
 func DecodeAudio(path string, onChunk func([]int16), events chan<- AudioEvent) (*AudioStream, error) {
+	return DecodeAudioAt(path, 0, onChunk, events)
+}
+
+// DecodeAudioAt is DecodeAudio starting from seek into the file (0 for
+// the beginning) — an input-side `-ss` seek, ffmpeg's fast, keyframe-ish
+// seek rather than a precise decode-and-discard one. Vid uses this for
+// scrubbing; Amp always seeks to zero via plain DecodeAudio.
+func DecodeAudioAt(path string, seek time.Duration, onChunk func([]int16), events chan<- AudioEvent) (*AudioStream, error) {
 	if !Available() {
 		return nil, fmt.Errorf("ffmpeg not found on PATH — install it to play audio (e.g. apt install ffmpeg)")
 	}
-	cmd := exec.Command("ffmpeg",
+	args := seekArgs(seek)
+	args = append(args,
 		"-i", path,
 		"-vn",
 		"-f", "s16le",
@@ -76,6 +86,7 @@ func DecodeAudio(path string, onChunk func([]int16), events chan<- AudioEvent) (
 		"-nostdin",
 		"pipe:1",
 	)
+	cmd := exec.Command("ffmpeg", args...)
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, fmt.Errorf("ffdecode: %w", err)

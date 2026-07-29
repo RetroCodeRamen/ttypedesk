@@ -48,7 +48,7 @@ There's also a GUI–TUI Bridge that renders real, unmodified X11 apps as window
 - gcc / ar (to build vendored libvterm — yes, there's C in here; a terminal emulator without a real VT100 parser is just a very confident text box)
 - A truecolor-capable host terminal (`COLORTERM=truecolor` recommended — this is a 2026 desktop wearing 1998's clothes, it still wants the good colors)
 - **Optional:** `Xvfb` (+ whatever GUI apps you want to bridge in) if you want to use the [GUI–TUI App Bridge](docs/gui-bridge.md) — `bridge:firefox`, `bridge:gimp`, genuinely any X11 app, rendered as half-blocks in a window like everything else. Not needed for anything else in the desktop. Also optional: `dbus-daemon` + `at-spi2-registryd` (`at-spi2-core`), for legible real text instead of colored noise in bridged **native GTK/Qt** apps — doesn't help Electron-based apps (e.g. Cursor/VS Code), see the doc for why.
-- **Optional:** `ffmpeg` if you want to use **Amp** (Start ▸ Programs ▸ Amp), the built-in music player — decoding always shells out to it rather than linking a decoder library. Not needed for anything else.
+- **Optional:** `ffmpeg` if you want to use **Amp** (music player) or **Vid** (video player), both in Start ▸ Programs — decoding always shells out to it rather than linking a decoder library. Not needed for anything else.
 
 libvterm **0.3.3** is vendored under `third_party/libvterm-0.3.3` (no system package required — one less thing to go wrong on someone else's machine).
 

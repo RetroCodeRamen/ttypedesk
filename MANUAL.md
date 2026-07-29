@@ -19,6 +19,7 @@ the desktop to be running.
 - [App Store](#app-store)
 - [Notifications](#notifications)
 - [Amp (audio player)](#amp-audio-player)
+- [Vid (video player)](#vid-video-player)
 - [Terminal features](#terminal-features)
 - [GUI–TUI App Bridge](#guitui-app-bridge)
 - [Remote attach](#remote-attach)
@@ -293,6 +294,37 @@ of its own. Track position shown in the transport is wall-clock time since
 play started (`pkg/uiapp.MediaClock`), not a sample-accurate decode
 position — accurate for real-time playback (audio hardware paces itself),
 but there's no scrub/seek in this first pass, only Amp's own next/previous.
+
+## Vid (video player)
+
+Start ▸ Programs ▸ Vid, or the palette (`vid`). Terminal-native video —
+live frames decoded straight to half-block cells, not a GUI nest running
+a real video player (that's what the [GUI–TUI Bridge](#guitui-app-bridge)
+is for, e.g. `bridge:mpv`, if you want a raster-only alternative). **O**
+opens a file (the same modal [file picker](#files) Amp uses), **Space**
+plays/pauses, **Left**/**Right** seek 5 seconds back/forward, **S** stops.
+
+Video decode is `ffmpeg`, always — piped raw RGB24 frames, pre-scaled by
+`ffmpeg` itself to roughly the pixel resolution the current window can
+actually show (no point piping full source resolution just to downsample
+it a moment later), then run through the exact same half-block encoder
+(`internal/gfx.EncodeHalfBlockFit`) wallpaper images and the Bridge use.
+The file's audio track (if it has one) decodes through a **second**,
+independent `ffmpeg` process into the same `Host.PlayAudio` path Amp
+uses — not multiplexed through one process. A file with no audio track,
+or one whose audio `ffmpeg` can't extract for whatever reason, isn't
+fatal: video keeps playing without sound rather than failing outright,
+the same "degrade the specific thing, not the whole feature" posture as
+the Bridge's AT-SPI text overlay.
+
+**Scrub** (Left/Right) isn't a true random-access seek — there's no such
+thing against a live raw-frame pipe. It works by tearing down both
+decode processes and restarting them with an input-side `ffmpeg -ss`
+(a fast, keyframe-ish seek, not frame-accurate), which is exactly what
+happens on Play if you seek while paused too. Frame rate adapts down
+over SSH the same blunt way the Bridge's does today: a fixed lower
+budget (`config.OverSSH()`), not a live-measured one — resolution itself
+doesn't adapt yet.
 
 ## Terminal features
 

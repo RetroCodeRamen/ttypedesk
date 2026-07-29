@@ -202,6 +202,7 @@ func catalogHits(env Env, filter string) []Hit {
 		{"Calendar", "month view", "📅", "calendar", 48},
 		{"Clock", "digital clock", "🕐", "clock", 40},
 		{"Amp", "music player", "🎵", "amp", 40},
+		{"Vid", "video player", "🎬", "vid", 40},
 		{"Manual", "user guide", "📖", "manual", 45},
 		{"Image Viewer", "graphics", "🖼", "image", 40},
 		{"System folder", "Manual on disk", "📂", "files:system", 35},

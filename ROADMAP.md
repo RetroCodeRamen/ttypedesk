@@ -194,11 +194,11 @@ Native `uiapp` music player with **classic Winamp energy** (not a flat “Spotif
 
 Terminal-native video: live **frames → ASCII / half-block cells**, not a GUI nest.
 
-- [ ] **Vid** (working title) — open video file; play with scrub / pause
-- [ ] Live converter path: decode → grayscale/color downsample → glyph or ▀▄ half-block grid at window size
-- [ ] Adaptive FPS / resolution under SSH FPS budget (reuse wallpaper/bridge cell techniques)
-- [ ] Optional: pipe from `ffmpeg`/`mpv` raw frames for the MVP converter instead of linking decoders in-process
-- [ ] Audio track via same Amp / audio-stream path when available
+- [x] **Vid** — `apps/vid`; open video file (file picker), play/pause, scrub (Left/Right seek — an input-side ffmpeg `-ss` restart, not a live random-access seek; there's no such thing against a raw decode pipe)
+- [x] Live converter path: `internal/ffdecode` decodes raw RGB24 frames via ffmpeg, `internal/gfx.EncodeHalfBlockFit` (unchanged, shared with wallpaper/imageview/Bridge) turns them into the ▀▄ half-block grid at window size
+- [x] Adaptive FPS under SSH — a fixed lower decode frame rate over SSH (`config.OverSSH()`), not a live-measured budget; resolution itself doesn't adapt in this first pass
+- [x] Pipes raw frames from an `ffmpeg` subprocess — never a linked decoder library, matching Amp and the Bridge's own Xvfb posture (soft runtime dependency)
+- [x] Audio track via the same decode-to-`Host.PlayAudio` path Amp uses (`internal/ffdecode.DecodeAudio`, shared) — decoded as its own separate ffmpeg process against the same file, not multiplexed through one process; a file with no audio track (or one that fails to decode) degrades to video-only rather than failing the whole thing
 
 ## Messenger (no Desk-operated server)
 

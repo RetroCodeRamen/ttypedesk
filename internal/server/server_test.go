@@ -518,6 +518,34 @@ func TestCreateAppAmpRendersWithoutCrashing(t *testing.T) {
 	}
 }
 
+func TestCreateAppVidRendersWithoutCrashing(t *testing.T) {
+	s := newTestServer()
+	win, err := s.CreateApp("vid", "Vid")
+	if err != nil {
+		t.Fatalf("CreateApp: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+
+	_ = win.Surface.ProduceDiff()
+	cells := win.Surface.Snapshot()
+	if len(cells) == 0 {
+		t.Fatal("Snapshot() returned no cells")
+	}
+	for _, key := range []string{"Left", "Right"} {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: key}); err != nil {
+			t.Fatalf("HandleInput %s: %v", key, err)
+		}
+	}
+	for _, r := range []rune{' ', 's'} {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Rune: r}); err != nil {
+			t.Fatalf("HandleInput rune %q: %v", r, err)
+		}
+	}
+	if title := win.Surface.Title(); strings.Contains(title, "crashed") {
+		t.Fatalf("Title() = %q — Vid crashed during basic interaction", title)
+	}
+}
+
 func TestCreateFilePickerOpensWindow(t *testing.T) {
 	s := newTestServer()
 	home := t.TempDir()
