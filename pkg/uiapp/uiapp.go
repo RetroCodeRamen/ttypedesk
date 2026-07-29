@@ -64,8 +64,7 @@ type Host interface {
 	// PlayAudio streams pcm (interleaved int16 samples, at the fixed
 	// internal/audio.SampleRate/Channels — decode to that rate/channel
 	// count, there is no per-call resampling) to the shared audio output.
-	// The returned stop func halts playback and releases the player.
-	PlayAudio(pcm <-chan []int16) (stop func(), err error)
+	PlayAudio(pcm <-chan []int16) (AudioPlayback, error)
 }
 
 // Event kinds.
@@ -217,13 +216,31 @@ func (c *Context) PickFile(startDir string, extensions []string, onResult func(p
 	}
 }
 
+// AudioPlayback controls audio started via Host.PlayAudio. Pause/Resume
+// don't restart or re-seek anything — see internal/audio.Playback, the
+// concrete implementation, for why pausing is also free backpressure on
+// whatever's decoding upstream.
+type AudioPlayback interface {
+	Pause()
+	Resume()
+	Playing() bool
+	Stop()
+}
+
 // PlayAudio streams pcm to the shared audio output; see Host.PlayAudio.
-func (c *Context) PlayAudio(pcm <-chan []int16) (stop func(), err error) {
+func (c *Context) PlayAudio(pcm <-chan []int16) (AudioPlayback, error) {
 	if h := c.Host(); h != nil {
 		return h.PlayAudio(pcm)
 	}
-	return func() {}, nil
+	return noopPlayback{}, nil
 }
+
+type noopPlayback struct{}
+
+func (noopPlayback) Pause()        {}
+func (noopPlayback) Resume()       {}
+func (noopPlayback) Playing() bool { return false }
+func (noopPlayback) Stop()         {}
 
 func (c *Context) SetSize(cols, rows int) {
 	c.mu.Lock()

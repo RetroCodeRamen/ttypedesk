@@ -54,7 +54,7 @@ func (h *appHost) PickFile(startDir string, extensions []string, onResult func(p
 	}
 }
 
-func (h *appHost) PlayAudio(pcm <-chan []int16) (func(), error) {
+func (h *appHost) PlayAudio(pcm <-chan []int16) (uiapp.AudioPlayback, error) {
 	return audio.Play(pcm)
 }
 

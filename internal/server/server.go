@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/ttypedesk/ttypedesk/apps/addprog"
+	"github.com/ttypedesk/ttypedesk/apps/amp"
 	"github.com/ttypedesk/ttypedesk/apps/appstore"
 	"github.com/ttypedesk/ttypedesk/apps/calendar"
 	"github.com/ttypedesk/ttypedesk/apps/clock"
@@ -269,6 +270,8 @@ func (s *Server) launchAction(action string) error {
 		return err
 	case "appstore", "app-store", "store":
 		return s.FocusOrCreateApp("appstore", "App Store")
+	case "amp":
+		return s.FocusOrCreateApp("amp", "Amp")
 	default:
 		if len(action) > 5 && action[:5] == "open:" {
 			return s.OpenPath(action[5:])
@@ -686,6 +689,11 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 			}
 			surf, err = surface.NewAppSurface(id, "Image Viewer", app, cc, cr)
 			title = "Image Viewer"
+		case "amp":
+			w, h = 60, 20
+			cc, cr = w-2, h-2
+			surf, err = surface.NewAppSurface(id, "Amp", amp.New(), cc, cr)
+			title = "Amp"
 		case "filepicker":
 			w, h = 56, 18
 			cc, cr = w-2, h-2

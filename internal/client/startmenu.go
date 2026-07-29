@@ -27,6 +27,7 @@ func (c *Client) buildStartMenu() {
 		{Label: "Calendar", Icon: c.iconGlyph("📅"), Do: launch("calendar")},
 		{Label: "Clock", Icon: c.iconGlyph("🕐"), Do: launch("clock")},
 		{Label: "Image Viewer", Icon: c.iconGlyph("🖼"), Do: launch("image")},
+		{Label: "Amp", Icon: c.iconGlyph("🎵"), Do: launch("amp")},
 	}
 	system := []startMenuItem{
 		{Label: "Terminal", Icon: c.iconGlyph("💻"), Do: launch("terminal")},

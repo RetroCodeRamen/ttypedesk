@@ -48,11 +48,28 @@ func sharedContext() (*oto.Context, error) {
 	return ctx, ctxErr
 }
 
+// Playback controls audio started via Play. Pause/Resume map straight onto
+// oto's own Player.Pause/Play — pausing doesn't restart or re-seek
+// anything, and it doubles as backpressure on the whole pipeline for free:
+// once the player stops pulling from the reader, the feeding goroutine's
+// channel send blocks, which blocks whatever's decoding upstream (e.g. an
+// ffmpeg subprocess whose stdout pipe just fills up) — no separate pause
+// signal needs to reach the decoder.
+type Playback struct {
+	player *oto.Player
+	stopFn func()
+}
+
+func (p *Playback) Pause()        { p.player.Pause() }
+func (p *Playback) Resume()       { p.player.Play() }
+func (p *Playback) Playing() bool { return p.player.IsPlaying() }
+func (p *Playback) Stop()         { p.stopFn() }
+
 // Play streams pcm (interleaved int16 samples at SampleRate/Channels) to
-// the shared audio output until pcm is closed or stop is called. stop is
+// the shared audio output until pcm is closed or Stop is called. Stop is
 // safe to call more than once (and safe to never call, if pcm closes on
 // its own — e.g. end of track).
-func Play(pcm <-chan []int16) (stop func(), err error) {
+func Play(pcm <-chan []int16) (*Playback, error) {
 	c, err := sharedContext()
 	if err != nil {
 		return nil, err
@@ -61,11 +78,14 @@ func Play(pcm <-chan []int16) (stop func(), err error) {
 	player := c.NewPlayer(r)
 	player.Play()
 	var stopOnce sync.Once
-	return func() {
-		stopOnce.Do(func() {
-			close(r.stop)
-			_ = player.Close()
-		})
+	return &Playback{
+		player: player,
+		stopFn: func() {
+			stopOnce.Do(func() {
+				close(r.stop)
+				_ = player.Close()
+			})
+		},
 	}, nil
 }
 

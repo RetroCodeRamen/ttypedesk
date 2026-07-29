@@ -175,19 +175,20 @@ Start ▸ App Store — install extra apps from configured GitHub catalogs (fetc
 - [ ] More sample native apps as needed (beyond Clock / Notes / Settings / Files)
 - [ ] Proto `notify` message for out-of-process apps (hooks system notification service)
 
-## First-party media apps (after comprehensive API)
+## First-party media apps
 
-Depends on a solid App/Host API (decode pipeline, timers, optional audio stream to local speakers — see [docs/audio-stream.md](docs/audio-stream.md)). Not near-term.
+The App/Host API this depended on (decode pipeline hooks, media clock,
+file picker) landed — see the Apps & platform section above.
 
 ### Winamp-style audio player
 
 Native `uiapp` music player with **classic Winamp energy** (not a flat “Spotify clone”): skinnable chrome feel in cells, playlist, EQ-ish bars, transport.
 
-- [ ] **Amp** (working title) — open local files / folders; playlist; play/pause/stop/next/prev
-- [ ] Visualizer bars / spectrum from PCM (half-block or ASCII meters)
-- [ ] Skin-ish layout: main window + optional playlist / EQ panes (separate floating windows or docked panels)
-- [ ] Formats via host decode (ffmpeg/lib or exec helper) — keep Desk free of format soup in the WM
-- [ ] Wire to audio-stream companion when over SSH so sound plays on the laptop
+- [x] **Amp** — `apps/amp`; open local files (via the file picker), playlist, play/pause/stop/next/prev
+- [x] Visualizer bars from PCM (windowed peak amplitude across 16 bars, half-block-rendered — not a real FFT spectrum; see `apps/amp/decode.go`)
+- [x] Layout: single window, playlist + transport + visualizer together — not separate floating skin/EQ panes, which felt like unearned complexity for a v1 with no actual EQ processing to show
+- [x] Formats via host decode — ffmpeg subprocess (`-f s16le` raw PCM out), no linked decoder library; a soft runtime dependency, checked at launch with a clear error if missing
+- [ ] Wire to audio-stream companion when over SSH so sound plays on the laptop — depends on the Audio streaming section below, not yet built
 
 ### ASCII video player
 

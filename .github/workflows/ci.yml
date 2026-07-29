@@ -26,6 +26,9 @@ jobs:
       - name: Install dbus + at-spi2-core + zenity (for the AT-SPI text overlay tests)
         run: sudo apt-get install -y dbus-x11 at-spi2-core zenity
 
+      - name: Install ffmpeg (for apps/amp's decode tests)
+        run: sudo apt-get install -y ffmpeg
+
       - name: Build (vendored libvterm + binary)
         run: ./build.sh
 

@@ -162,7 +162,7 @@ func (b *hostBridge) PickFile(startDir string, extensions []string, onResult fun
 	b.inner.PickFile(startDir, extensions, onResult)
 }
 
-func (b *hostBridge) PlayAudio(pcm <-chan []int16) (func(), error) {
+func (b *hostBridge) PlayAudio(pcm <-chan []int16) (uiapp.AudioPlayback, error) {
 	return b.inner.PlayAudio(pcm)
 }
 

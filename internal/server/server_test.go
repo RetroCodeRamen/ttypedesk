@@ -3,6 +3,7 @@ package server
 import (
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/ttypedesk/ttypedesk/internal/config"
@@ -482,6 +483,38 @@ func TestLaunchActionBridgeCreatesWindow(t *testing.T) {
 	}
 	if win.Title != "xclock" {
 		t.Fatalf("Title = %q, want xclock", win.Title)
+	}
+}
+
+func TestCreateAppAmpRendersWithoutCrashing(t *testing.T) {
+	s := newTestServer()
+	win, err := s.CreateApp("amp", "Amp")
+	if err != nil {
+		t.Fatalf("CreateApp: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+
+	// Exercise Draw (via ProduceDiff/Snapshot) and a few keys/mouse events
+	// through the real AppSurface stack — AppSurface isolates a genuine
+	// panic into a crashed-window state rather than failing this test
+	// directly, so also assert the window didn't quietly crash.
+	_ = win.Surface.ProduceDiff()
+	cells := win.Surface.Snapshot()
+	if len(cells) == 0 {
+		t.Fatal("Snapshot() returned no cells")
+	}
+	for _, key := range []string{"Up", "Down", "Enter"} {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: key}); err != nil {
+			t.Fatalf("HandleInput %s: %v", key, err)
+		}
+	}
+	for _, r := range []rune{' ', 'n', 'p', 's'} {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Rune: r}); err != nil {
+			t.Fatalf("HandleInput rune %q: %v", r, err)
+		}
+	}
+	if title := win.Surface.Title(); strings.Contains(title, "crashed") {
+		t.Fatalf("Title() = %q — Amp crashed during basic interaction", title)
 	}
 }
 

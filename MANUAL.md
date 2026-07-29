@@ -18,6 +18,7 @@ the desktop to be running.
 - [Calendar](#calendar)
 - [App Store](#app-store)
 - [Notifications](#notifications)
+- [Amp (audio player)](#amp-audio-player)
 - [Terminal features](#terminal-features)
 - [GUI–TUI App Bridge](#guitui-app-bridge)
 - [Remote attach](#remote-attach)
@@ -265,6 +266,33 @@ again. Settings controls banner visibility, auto-dismiss timing, and an
 SSH-specific "badge only, no popup" mode for links where a banner mid-frame
 would just be noise. Session history can optionally persist to
 `notifications.json` across restarts.
+
+## Amp (audio player)
+
+Start ▸ Programs ▸ Amp, or the palette (`amp`). A small Winamp-flavored
+player: **O** opens a file (through the same modal [file picker](#files)
+Vid also uses), **Space** plays/pauses, **N**/**P** skip next/previous,
+**S** stops, **D** removes the selected playlist row, arrows navigate the
+playlist, Enter or a click plays a row directly.
+
+Decoding is always an `ffmpeg` subprocess — never a linked decoder
+library, so the desktop binary itself stays free of format-specific code.
+`ffmpeg` is a soft runtime dependency exactly like `Xvfb` for the
+[GUI–TUI Bridge](#guitui-app-bridge): only needed if you actually open
+Amp, checked at launch, with a clear status message (not a crash) if it's
+missing. The visualizer bars are real peak amplitude computed from the
+decoded PCM stream in fixed windows — not a true FFT spectrum, deliberately;
+a proper spectrum analyzer was more complexity than a v1 visualizer needs.
+
+Pause is a real pause, not stop-and-restart: it maps directly onto the
+underlying audio player's own pause/resume, which also means pausing
+doubles as backpressure on the whole pipeline for free — once playback
+stops draining decoded samples, the feeding goroutine blocks, which blocks
+`ffmpeg`'s own stdout write, with nothing needing an explicit pause signal
+of its own. Track position shown in the transport is wall-clock time since
+play started (`pkg/uiapp.MediaClock`), not a sample-accurate decode
+position — accurate for real-time playback (audio hardware paces itself),
+but there's no scrub/seek in this first pass, only Amp's own next/previous.
 
 ## Terminal features
 
