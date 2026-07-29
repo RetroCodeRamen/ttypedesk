@@ -209,20 +209,19 @@ Keyboard and mouse (press/drag/release/wheel) forward to the host; window chrome
 
 ## Versioning
 
-`MAJOR.MINOR.YYMMNN` — e.g. `0.4.260735`. `MAJOR.MINOR` lives in [VERSION](VERSION)
+`MAJOR.MINOR.YYMMNN` — e.g. `1.0.260752`. `MAJOR.MINOR` lives in [VERSION](VERSION)
 and is bumped by hand; `YYMMNN` is computed by [scripts/version.sh](scripts/version.sh)
 (year, month, and a count of commits so far this calendar month) and baked
 into the binary at build time (`./build.sh`, or `ttypedesk -version` to
-check what's running). Still `0` for major — no compatibility promises yet,
-config shape and internal APIs are still moving.
+check what's running).
 
-Every commit gets tagged automatically (`v0.4.260735`, …) via a `post-commit`
+Every commit gets tagged automatically (`v1.0.260752`, …) via a `post-commit`
 hook once `core.hooksPath` points at [.githooks](.githooks) — `./build.sh`
 sets that the first time you run it in a fresh clone.
 
-### Post-1.0 stability policy
+### Stability policy
 
-Once major hits `1`, two surfaces stop moving casually:
+Major is `1` as of this line, which means two surfaces stop moving casually:
 
 - **`config.json`** — additive-only. New fields always get a safe zero-value
   default (so an old config still loads fine); existing field names/types

@@ -490,16 +490,14 @@ sync tool write it, or run a second instance pointed at the same file, and
 the running desktop picks up the change within about two seconds, live,
 no restart.
 
-Versioning is `MAJOR.MINOR.YYMMNN` (e.g. `0.4.260735`): `MAJOR.MINOR` is
+Versioning is `MAJOR.MINOR.YYMMNN` (e.g. `1.0.260752`): `MAJOR.MINOR` is
 hand-bumped in `VERSION`, `YYMMNN` is year + month + a running count of
 commits so far that calendar month, computed by `scripts/version.sh` and
 baked into the binary at build time. `ttypedesk -version` prints what's
-actually running. Every commit gets auto-tagged (`v0.4.260735`, …) via a
+actually running. Every commit gets auto-tagged (`v1.0.260752`, …) via a
 `post-commit` git hook.
 
-Major version `0` means no compatibility promises yet — config shape and
-internal APIs can still move. Once major hits `1`, two specific surfaces
-stop moving casually:
+Major version `1` means two specific surfaces stop moving casually:
 
 - **`config.json`** stays additive-only — new fields always ship with a
   safe zero-value default so an old config keeps loading, existing
