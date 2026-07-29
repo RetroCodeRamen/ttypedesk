@@ -8,6 +8,7 @@
 package uiapp
 
 import (
+	"os"
 	"sync"
 	"time"
 
@@ -46,6 +47,25 @@ type Host interface {
 	SetTitle(title string)
 	RequestClose()
 	WindowID() string
+
+	// SaveCredential/LoadCredential persist a secret (OAuth2 tokens, a
+	// session token, …) under ~/.config/ttypedesk/credentials/ — never in
+	// config.json or git. LoadCredential's error wraps os.ErrNotExist when
+	// nothing has been saved under key yet.
+	SaveCredential(key string, value []byte) error
+	LoadCredential(key string) ([]byte, error)
+
+	// PickFile opens a small modal file browser rooted at startDir,
+	// restricted to the given extensions if any are given (without the
+	// leading dot; empty means no filter). onResult fires exactly once,
+	// asynchronously, with ok=false if the user cancels.
+	PickFile(startDir string, extensions []string, onResult func(path string, ok bool))
+
+	// PlayAudio streams pcm (interleaved int16 samples, at the fixed
+	// internal/audio.SampleRate/Channels — decode to that rate/channel
+	// count, there is no per-call resampling) to the shared audio output.
+	// The returned stop func halts playback and releases the player.
+	PlayAudio(pcm <-chan []int16) (stop func(), err error)
 }
 
 // Event kinds.
@@ -168,6 +188,41 @@ func (c *Context) RequestClose() {
 	if h := c.Host(); h != nil {
 		h.RequestClose()
 	}
+}
+
+// SaveCredential persists a secret under key (no-op if host unset).
+func (c *Context) SaveCredential(key string, value []byte) error {
+	if h := c.Host(); h != nil {
+		return h.SaveCredential(key, value)
+	}
+	return nil
+}
+
+// LoadCredential reads back a secret saved under key.
+func (c *Context) LoadCredential(key string) ([]byte, error) {
+	if h := c.Host(); h != nil {
+		return h.LoadCredential(key)
+	}
+	return nil, os.ErrNotExist
+}
+
+// PickFile opens a modal file browser; see Host.PickFile.
+func (c *Context) PickFile(startDir string, extensions []string, onResult func(path string, ok bool)) {
+	if h := c.Host(); h != nil {
+		h.PickFile(startDir, extensions, onResult)
+		return
+	}
+	if onResult != nil {
+		onResult("", false)
+	}
+}
+
+// PlayAudio streams pcm to the shared audio output; see Host.PlayAudio.
+func (c *Context) PlayAudio(pcm <-chan []int16) (stop func(), err error) {
+	if h := c.Host(); h != nil {
+		return h.PlayAudio(pcm)
+	}
+	return func() {}, nil
 }
 
 func (c *Context) SetSize(cols, rows int) {

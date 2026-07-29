@@ -1,11 +1,13 @@
 package server
 
 import (
+	"os"
 	"os/exec"
 	"testing"
 
 	"github.com/ttypedesk/ttypedesk/internal/config"
 	"github.com/ttypedesk/ttypedesk/internal/session"
+	"github.com/ttypedesk/ttypedesk/internal/surface"
 )
 
 // newTestServer returns a Server sized like a typical host terminal, using
@@ -480,6 +482,81 @@ func TestLaunchActionBridgeCreatesWindow(t *testing.T) {
 	}
 	if win.Title != "xclock" {
 		t.Fatalf("Title = %q, want xclock", win.Title)
+	}
+}
+
+func TestCreateFilePickerOpensWindow(t *testing.T) {
+	s := newTestServer()
+	home := t.TempDir()
+	win, err := s.CreateFilePicker(home, nil, func(string, bool) {})
+	if err != nil {
+		t.Fatalf("CreateFilePicker: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+	if win.Kind != "app" {
+		t.Fatalf("Kind = %q, want app", win.Kind)
+	}
+	if win.Title != "Open File" {
+		t.Fatalf("Title = %q, want Open File", win.Title)
+	}
+}
+
+func TestCreateFilePickerEscCancels(t *testing.T) {
+	s := newTestServer()
+	home := t.TempDir()
+	var gotPath string
+	var gotOK, called bool
+	win, err := s.CreateFilePicker(home, nil, func(path string, ok bool) {
+		called, gotPath, gotOK = true, path, ok
+	})
+	if err != nil {
+		t.Fatalf("CreateFilePicker: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Escape"}); err != nil {
+		t.Fatalf("HandleInput Escape: %v", err)
+	}
+	if !called {
+		t.Fatal("onResult was never called after Escape")
+	}
+	if gotOK {
+		t.Errorf("onResult ok = true, want false (cancelled)")
+	}
+	if gotPath != "" {
+		t.Errorf("onResult path = %q, want empty", gotPath)
+	}
+}
+
+func TestCreateFilePickerPicksFile(t *testing.T) {
+	s := newTestServer()
+	home := t.TempDir()
+	if err := os.WriteFile(home+"/pick-me.txt", []byte("x"), 0o644); err != nil {
+		t.Fatalf("write fixture: %v", err)
+	}
+	var gotPath string
+	var gotOK bool
+	win, err := s.CreateFilePicker(home, nil, func(path string, ok bool) {
+		gotPath, gotOK = path, ok
+	})
+	if err != nil {
+		t.Fatalf("CreateFilePicker: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+
+	// The picker lists ".." first (a temp dir always has a distinct parent),
+	// then sorted dirs, then sorted files — "pick-me.txt" is row 1 here.
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Down"}); err != nil {
+		t.Fatalf("HandleInput Down: %v", err)
+	}
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Enter"}); err != nil {
+		t.Fatalf("HandleInput Enter: %v", err)
+	}
+	if !gotOK {
+		t.Fatal("onResult ok = false, want true (a file was picked)")
+	}
+	if gotPath != home+"/pick-me.txt" {
+		t.Errorf("onResult path = %q, want %q", gotPath, home+"/pick-me.txt")
 	}
 }
 

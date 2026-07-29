@@ -150,6 +150,22 @@ func (b *hostBridge) Launch(action string) error      { return b.inner.Launch(ac
 func (b *hostBridge) OpenPath(path string) error      { return b.inner.OpenPath(path) }
 func (b *hostBridge) WindowID() string                { return b.inner.WindowID() }
 
+func (b *hostBridge) SaveCredential(key string, value []byte) error {
+	return b.inner.SaveCredential(key, value)
+}
+
+func (b *hostBridge) LoadCredential(key string) ([]byte, error) {
+	return b.inner.LoadCredential(key)
+}
+
+func (b *hostBridge) PickFile(startDir string, extensions []string, onResult func(path string, ok bool)) {
+	b.inner.PickFile(startDir, extensions, onResult)
+}
+
+func (b *hostBridge) PlayAudio(pcm <-chan []int16) (func(), error) {
+	return b.inner.PlayAudio(pcm)
+}
+
 func (b *hostBridge) SetTitle(title string) {
 	// Never take AppSurface.mu — may be called from Handle/Draw while mu is held.
 	b.surf.titleMu.Lock()

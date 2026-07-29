@@ -13,6 +13,7 @@ import (
 	"github.com/ttypedesk/ttypedesk/apps/appstore"
 	"github.com/ttypedesk/ttypedesk/apps/calendar"
 	"github.com/ttypedesk/ttypedesk/apps/clock"
+	"github.com/ttypedesk/ttypedesk/apps/filepicker"
 	"github.com/ttypedesk/ttypedesk/apps/files"
 	"github.com/ttypedesk/ttypedesk/apps/imageview"
 	"github.com/ttypedesk/ttypedesk/apps/manual"
@@ -71,6 +72,14 @@ type Server struct {
 	hostCols int
 	hostRows int
 	dock     string // top | bottom | left | right
+
+	// pendingPicker* smuggle CreateFilePicker's extra construction args
+	// (which createLocked's shared, widely-called signature has no room
+	// for) across the single createLocked call that constructs the
+	// filepicker app — set immediately before, cleared immediately after,
+	// all under mu, never observed by any other case.
+	pendingPickerExtensions []string
+	pendingPickerResult     func(path string, ok bool)
 }
 
 func New(cfg config.Config) *Server {
@@ -496,6 +505,28 @@ func (s *Server) CreateGfx(title, path string) (*Window, error) {
 	return win, nil
 }
 
+// CreateFilePicker opens a small modal file browser rooted at startDir,
+// restricted to extensions if any are given. onResult fires exactly once,
+// asynchronously, with ok=false if the user cancels — see Host.PickFile.
+func (s *Server) CreateFilePicker(startDir string, extensions []string, onResult func(path string, ok bool)) (*Window, error) {
+	s.mu.Lock()
+	s.pendingPickerExtensions = extensions
+	s.pendingPickerResult = onResult
+	win, err := s.createLocked("app", "Open File", "filepicker", startDir, "", nil, false)
+	s.pendingPickerExtensions = nil
+	s.pendingPickerResult = nil
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	if err := s.bindNativeApp(win); err != nil {
+		slog.Error("BindHost failed id=%s: %v", win.ID, err)
+		s.CloseWindow(win.ID)
+		return nil, err
+	}
+	return win, nil
+}
+
 // CreateBridge opens command as a bridged GUI app (see internal/bridge) —
 // an off-screen Xvfb rendering the target X11 program, captured into cells.
 func (s *Server) CreateBridge(title, command string) (*Window, error) {
@@ -655,6 +686,12 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 			}
 			surf, err = surface.NewAppSurface(id, "Image Viewer", app, cc, cr)
 			title = "Image Viewer"
+		case "filepicker":
+			w, h = 56, 18
+			cc, cr = w-2, h-2
+			surf, err = surface.NewAppSurface(id, "Open File",
+				filepicker.New(path, s.pendingPickerExtensions, s.pendingPickerResult), cc, cr)
+			title = "Open File"
 		default:
 			return nil, fmt.Errorf("unknown app %q", appName)
 		}
