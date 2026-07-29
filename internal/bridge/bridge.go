@@ -15,6 +15,7 @@ import (
 
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
+	"github.com/ttypedesk/ttypedesk/internal/config"
 	"github.com/ttypedesk/ttypedesk/internal/gfx"
 	"github.com/ttypedesk/ttypedesk/internal/slog"
 	"github.com/ttypedesk/ttypedesk/internal/surface"
@@ -25,6 +26,11 @@ import (
 // desktop (internal/attach.Serve) — a reasonable frame budget for a nested
 // GUI app without saturating a single core on repeated GetImage calls.
 const captureFPS = 10
+
+// sshMinFPS is the floor the adaptive frame budget backs off to over SSH
+// when a frame is expensive to produce — a flat captureFPS regardless of
+// cost just wastes bandwidth on a slow link for no visual benefit.
+const sshMinFPS = 2
 
 // xvfbCellW/H are the pixel size Xvfb is launched at, per cell. The exact
 // values don't need to match any real font metrics — EncodeHalfBlockFit
@@ -49,6 +55,36 @@ const (
 	atspiMaxNodes = 2000
 )
 
+// overscanFactor pads the *current* RandR screen size beyond the window's
+// requested cell size, both at creation and on a settled live resize
+// (growScreen) — a small later grow then still resamples from real
+// captured pixels instead of upscaling a buffer sized to fit exactly.
+const overscanFactor = 1.25
+
+// xvfbCeilW/H are the fixed pixel size Xvfb is actually *launched* at when
+// RANDR is going to be used. Confirmed empirically: RANDR's SetScreenSize
+// can shrink an Xvfb screen freely, but can never grow it past whatever
+// size the server was launched with — "screen cannot be larger than WxH"
+// is a hard server-side limit, not a client-side one. So the only way for
+// a later live-resize to ever grow past a window's *initial* size is to
+// launch generously up front and RandR-shrink down to the real initial
+// size immediately (see New()), then RandR-grow back up as needed
+// (growScreen), capped at this ceiling. 1920x1080 comfortably covers any
+// realistic terminal window at this bridge's per-cell resolution
+// (xvfbCellW/H) while keeping the fixed per-window memory cost (~8MB)
+// bounded and predictable.
+const (
+	xvfbCeilW = 1920
+	xvfbCeilH = 1080
+)
+
+// resizeDebounce is how long Resize waits for further resize events before
+// actually growing the live Xvfb screen via RANDR (growScreen) — a live
+// drag-resize can fire many times a second, and RANDR's SetScreenSize is a
+// blocking X11 round trip that would otherwise stall every intermediate
+// frame of the drag.
+const resizeDebounce = 250 * time.Millisecond
+
 // BridgeSurface hosts one bridged GUI app. Implements surface.Surface.
 type BridgeSurface struct {
 	id      string
@@ -63,6 +99,16 @@ type BridgeSurface struct {
 	inj     *inputInjector
 	capW    int
 	capH    int
+	randrOK bool
+
+	// resizeDue is when a pending RANDR grow (growScreen) should actually
+	// run, checked from captureLoop — zero means none pending. A live
+	// drag-resize can call Resize many times a second; this just pushes
+	// the deadline out each time rather than spawning a goroutine per
+	// call, so growScreen only ever runs once resizing settles, and
+	// always from captureLoop's own goroutine (no extra synchronization
+	// needed against Close's teardown of conn).
+	resizeDue time.Time
 
 	// AT-SPI text overlay — optional/best-effort. a11y is nil (raster-only,
 	// no error) whenever dbus-daemon/at-spi2-registryd aren't available or
@@ -99,8 +145,14 @@ func New(id, command string, cols, rows int) (*BridgeSurface, error) {
 	if err != nil {
 		return nil, err
 	}
-	capW, capH := cols*xvfbCellW, rows*xvfbCellH
-	xvfbCmd, err := startXvfb(display, capW, capH)
+	// desiredW/H is what this window actually needs right now (with a
+	// little overscan headroom); xvfbCeilW/H is the fixed, larger size
+	// Xvfb is launched at so a later live resize (growScreen) has RandR
+	// headroom to grow into — see xvfbCeilW/H's comment for why growing
+	// past the launch size isn't possible at all otherwise.
+	desiredW := int(float64(cols) * xvfbCellW * overscanFactor)
+	desiredH := int(float64(rows) * xvfbCellH * overscanFactor)
+	xvfbCmd, err := startXvfb(display, xvfbCeilW, xvfbCeilH)
 	if err != nil {
 		return nil, err
 	}
@@ -118,6 +170,22 @@ func New(id, command string, cols, rows int) (*BridgeSurface, error) {
 		conn.Close()
 		killWait(xvfbCmd)
 		return nil, err
+	}
+	randrOK := initRandr(conn) == nil
+
+	// Shrink down from the ceiling to what this window actually needs,
+	// before the guest launches, so it paints into the right-sized canvas
+	// from the start instead of a brief "starts huge, then shrinks" blip.
+	// Non-fatal on failure (or if RANDR isn't available at all) — the
+	// guest just renders across the full ceiling size, which
+	// EncodeHalfBlockFit still resamples correctly, just less efficiently.
+	capW, capH := xvfbCeilW, xvfbCeilH
+	if randrOK && desiredW < xvfbCeilW && desiredH < xvfbCeilH {
+		if err := setScreenSize(conn, screen.Root, desiredW, desiredH); err == nil {
+			capW, capH = desiredW, desiredH
+		} else {
+			slog.Warn("bridge id=%s randr initial shrink: %v", id, err)
+		}
 	}
 
 	// AT-SPI text overlay setup — best-effort. Must happen before the guest
@@ -149,6 +217,7 @@ func New(id, command string, cols, rows int) (*BridgeSurface, error) {
 		inj:          inj,
 		capW:         capW,
 		capH:         capH,
+		randrOK:      randrOK,
 		busCmd:       busCmd,
 		registrydCmd: registrydCmd,
 		a11y:         a11y,
@@ -167,25 +236,39 @@ func New(id, command string, cols, rows int) (*BridgeSurface, error) {
 		b.wg.Add(1)
 		go b.atspiLoop()
 	}
-	slog.Info("bridge surface started id=%s display=:%d cmd=%q a11y=%v", id, display, command, a11y != nil)
+	slog.Info("bridge surface started id=%s display=:%d cmd=%q a11y=%v randr=%v", id, display, command, a11y != nil, randrOK)
 	return b, nil
 }
 
 func (b *BridgeSurface) captureLoop() {
 	defer b.wg.Done()
-	ticker := time.NewTicker(time.Second / captureFPS)
-	defer ticker.Stop()
+	overSSH := config.OverSSH()
+	interval := time.Second / captureFPS
+	timer := time.NewTimer(interval)
+	defer timer.Stop()
 	for {
 		select {
 		case <-b.stop:
 			return
-		case <-ticker.C:
+		case <-timer.C:
+			start := time.Now()
 			b.mu.Lock()
-			w, h, cols, rows := b.capW, b.capH, b.cols, b.rows
+			due := b.resizeDue
+			cols, rows := b.cols, b.rows
+			b.mu.Unlock()
+			if !due.IsZero() && !start.Before(due) {
+				b.growScreen(cols, rows)
+				b.mu.Lock()
+				b.resizeDue = time.Time{}
+				b.mu.Unlock()
+			}
+			b.mu.Lock()
+			w, h := b.capW, b.capH
 			b.mu.Unlock()
 			img, err := captureFrame(b.conn, b.root, w, h, b.byteOrd)
 			if err != nil {
 				slog.Warn("bridge id=%s capture: %v", b.id, err)
+				timer.Reset(interval)
 				continue
 			}
 			cells := gfx.EncodeHalfBlockFit(img, cols, rows, "stretch", 0, 0)
@@ -199,8 +282,34 @@ func (b *BridgeSurface) captureLoop() {
 			b.cells = cells
 			b.dirty = true
 			b.mu.Unlock()
+
+			if overSSH {
+				interval = adaptiveInterval(time.Since(start))
+			} else {
+				interval = time.Second / captureFPS
+			}
+			timer.Reset(interval)
 		}
 	}
+}
+
+// adaptiveInterval backs off the capture cadence over SSH when a frame is
+// expensive to produce, down to sshMinFPS, and recovers back toward the
+// full captureFPS once frames get cheap again — the local (non-SSH) case
+// keeps the flat captureFPS ticker, since there's no bandwidth to save.
+func adaptiveInterval(frameCost time.Duration) time.Duration {
+	base := time.Second / captureFPS
+	floor := time.Second / sshMinFPS
+	// Target: don't let capture+encode alone eat more than half the frame
+	// budget; back off proportionally, clamped to [base, floor].
+	want := frameCost * 2
+	if want < base {
+		return base
+	}
+	if want > floor {
+		return floor
+	}
+	return want
 }
 
 // atspiLoop periodically re-walks the guest's accessible tree and stashes
@@ -234,11 +343,14 @@ func (b *BridgeSurface) Size() (cols, rows int) {
 	return b.cols, b.rows
 }
 
-// Resize updates the cell grid the next capture resamples into. It
-// deliberately does not touch Xvfb or the guest process — relaunching Xvfb
-// on every window resize would kill the guest app's state for no real
-// benefit, since EncodeHalfBlockFit already rescales the captured frame to
-// whatever cols/rows the window has.
+// Resize updates the cell grid the next capture resamples into. It never
+// relaunches Xvfb or the guest process — relaunching on every window resize
+// would kill the guest app's state for no real benefit, since
+// EncodeHalfBlockFit already rescales the captured frame to whatever
+// cols/rows the window has. When the new size would exceed the current
+// (overscan-padded) capture buffer, it schedules a debounced live RANDR
+// resize (growScreen, run from captureLoop) instead of leaving the guest
+// painting at its original resolution forever.
 func (b *BridgeSurface) Resize(cols, rows int) {
 	if cols < 1 {
 		cols = 1
@@ -248,6 +360,30 @@ func (b *BridgeSurface) Resize(cols, rows int) {
 	}
 	b.mu.Lock()
 	b.cols, b.rows = cols, rows
+	b.dirty = true
+	needW, needH := cols*xvfbCellW, rows*xvfbCellH
+	atCeiling := b.capW >= xvfbCeilW && b.capH >= xvfbCeilH
+	if b.randrOK && !atCeiling && (needW > b.capW || needH > b.capH) {
+		b.resizeDue = time.Now().Add(resizeDebounce)
+	}
+	b.mu.Unlock()
+}
+
+// growScreen performs the actual (blocking) RANDR SetScreenSize call. Only
+// ever called from captureLoop, once resizing has settled (see resizeDue),
+// so it never races Close's teardown of conn and never stalls an
+// intermediate frame of a live drag-resize. Clamped to xvfbCeilW/H — the
+// fixed size Xvfb was actually launched at, and the hard limit on how far
+// RANDR can grow it back (see that constant's comment).
+func (b *BridgeSurface) growScreen(cols, rows int) {
+	newW := clampInt(int(float64(cols)*xvfbCellW*overscanFactor), 1, xvfbCeilW)
+	newH := clampInt(int(float64(rows)*xvfbCellH*overscanFactor), 1, xvfbCeilH)
+	if err := setScreenSize(b.conn, b.root, newW, newH); err != nil {
+		slog.Warn("bridge id=%s randr resize: %v", b.id, err)
+		return
+	}
+	b.mu.Lock()
+	b.capW, b.capH = newW, newH
 	b.dirty = true
 	b.mu.Unlock()
 }

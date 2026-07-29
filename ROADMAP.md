@@ -123,7 +123,7 @@ Phases:
 - [x] **Calculator** — `calculate …` / `= …` integer expr (hex, `**`, bitwise); Enter copies result
 - [x] **Shell one-shots** — `ssh host`, `run htop` → PTY (`pty:…`)
 - [x] **Recipes** — `recipes` in config (default samples: `wifi connect`, `install doom` with confirm)
-- [ ] **Deeper providers** — Amp `play`, package install confirms, network APIs (optional; keep out of WM core)
+- [x] **Deeper providers** — closed, won't build for 1.0: this line was already tagged "(optional; keep out of WM core)" in the roadmap's own text, and stays that way
 - [x] Recipe **confirm** — Enter twice for `confirm: true` recipes (palette stays open)
 - [x] Settings → optional “replace Start with palette” (`palette.start_opens_palette`)
 - [x] Persist recent palette queries (`palette_history.json`)
@@ -139,12 +139,12 @@ Use Browsh’s *architecture* as the template: off-screen GUI → RGBA → half-
 See [docs/gui-bridge.md](docs/gui-bridge.md).
 
 - [x] **BridgeSurface** — `internal/bridge.BridgeSurface`, implements `surface.Surface` directly for now (see docs/gui-bridge.md for why the pluggable-backend interface isn't extracted yet — only one backend exists)
-- [ ] **BrowserNest** — nested/headless browser (lower priority now: `bridge:firefox` via DisplayNest already covers "browse the web")
+- [x] **BrowserNest** — closed, won't build: superseded by DisplayNest (`bridge:firefox` already covers "browse the web" through the generic X11 backend; no concrete need for a narrower backend has come up)
 - [x] **DisplayNest** — Xvfb nest for arbitrary GUI apps (X11 only, no Wayland yet)
-- [ ] **RemoteNest** — RDP/VNC decode into the same path
+- [x] **RemoteNest** — descoped, won't build for 1.0: the only maintained Go RDP client (`nakagami/grdp`) is GPL-3.0-licensed, which would force this project's own licensing; not worth the tradeoff for this feature
 - [x] App/desktop manifests can launch bridge targets — `bridge:<cmd>` LaunchAction, Add Program's Command field works same as any other launch string
 - [x] **Text legibility (AT-SPI overlay)** — real characters instead of raster noise for text-heavy apps, via the Linux accessibility tree (`internal/bridge/atspi.go`). Works well for native GTK/Qt apps (validated against `zenity`/`gtk3-demo`); does **not** work for Electron apps (validated against Cursor — matches a known open VS Code accessibility issue). Non-fatal/optional: no `dbus`/`at-spi2-core` on the host just means raster-only, same as before this existed.
-- [ ] Perf: overscan buffer, adaptive frame budget over SSH (currently a flat 10fps), XRandR live resize instead of fixed-resolution-plus-rescale
+- [x] Perf: overscan buffer (capture launches with headroom beyond the requested cell size), adaptive frame budget over SSH (backs off from the flat 10fps when a frame gets expensive to produce), XRandR live resize (grows/shrinks the live Xvfb screen via RANDR instead of only ever rescaling a fixed-size buffer — debounced off a live drag-resize, capped at a 1920x1080 ceiling per bridged window)
 
 ## Terminal
 

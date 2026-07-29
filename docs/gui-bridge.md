@@ -87,11 +87,57 @@ The original design called for a `Backend` interface behind `BridgeSurface` so `
 
 (`gfx` window requests are internally handled as an `app` kind wrapping the image viewer — see `internal/server`.)
 
-## Not yet built
+## Closed decisions (won't build for 1.0)
 
-1. **BrowserNest** — a dedicated headless-browser backend. Lower priority now that DisplayNest exists: pointing DisplayNest at any browser binary (`bridge:firefox`) already covers the "browse the web" use case; BrowserNest would only be worth it for something a generic X11 nest can't do (e.g. avoiding a full browser window chrome, or a lighter-weight embedded engine).
-2. **RemoteNest** — RDP/VNC client decode into the same cells path. A genuinely separate protocol/problem domain from DisplayNest, not a variation of it.
-3. Perf follow-ups: overscan/pan buffer, adaptive frame budget under SSH (currently a flat 10fps), XRandR-based live resize instead of the current fixed-Xvfb-resolution-plus-rescale approach.
+1. **BrowserNest** — a dedicated headless-browser backend. Closed: pointing DisplayNest at any browser binary (`bridge:firefox`) already covers the "browse the web" use case, and no concrete need for a narrower, second backend has come up.
+2. **RemoteNest** — RDP/VNC client decode into the same cells path. Would have been a genuinely separate protocol/problem domain from DisplayNest, not a variation of it — but the only actively-maintained Go RDP client (`nakagami/grdp`) is GPL-3.0-licensed, and ttypedesk has no LICENSE file today (informally all-rights-reserved). Linking a GPL-3 dependency into the binary would force the whole project's licensing, which isn't a tradeoff worth making just for this feature. (VNC alone has a healthier option, `kward/go-vnc`, MIT-licensed — if RemoteNest is revisited later, VNC-only is the path, not RDP.)
+
+## Perf: capture sizing (shipped)
+
+The Bridge's raw-pixel capture used to be a flat 10fps against a fixed
+Xvfb resolution that exactly matched the window's initial cell size —
+correct, but with two rough edges: no headroom for a window that grows,
+and no way to back off frame rate when a frame gets expensive to produce
+(e.g. over SSH). Both are addressed now, still in `internal/bridge`:
+
+- **Overscan buffer** — the *current* RandR screen size is set a bit
+  (`overscanFactor`, 25%) larger than the window's requested cell size, so
+  a small later grow still resamples from real captured pixels instead of
+  immediately needing a live resize.
+- **Adaptive frame budget over SSH** — `captureLoop` measures its own
+  capture+encode cost each tick and, only when `config.OverSSH()`, backs
+  the ticker interval off proportionally (down to `sshMinFPS`) when a
+  frame gets expensive, recovering back toward the full `captureFPS` once
+  frames are cheap again. The local (non-SSH) path stays a flat 10fps —
+  there's no bandwidth to save there.
+- **XRandR live resize** — growing a window past its current (overscan-
+  padded) capture buffer schedules a debounced (`resizeDebounce`, 250ms)
+  live resize of the Xvfb screen via RANDR (`growScreen`, run from
+  `captureLoop` itself once resizing settles, never inline in `Resize` —
+  a live drag-resize can call `Resize` many times a second, and RANDR is a
+  blocking X11 round trip). Two non-obvious things learned getting this
+  right (both confirmed empirically against a real Xvfb, not assumed from
+  docs):
+  - RANDR's `SetScreenSize` can never grow a screen past whatever size
+    Xvfb was actually **launched** at — no matter how it's invoked. So
+    each `BridgeSurface` launches its private Xvfb at a fixed ceiling
+    (`xvfbCeilW/H`, 1920×1080 — comfortably covers any realistic terminal
+    window at this bridge's per-cell resolution, ~8MB fixed memory per
+    bridged window) and immediately RandR-shrinks down to the window's
+    real initial size, so `growScreen` always has headroom to grow back
+    into later, up to that ceiling.
+  - A plain `SetScreenSize` request alone isn't enough — it fails with
+    `BadMatch`/`BadValue` unless the screen's CRTC is reconfigured to
+    match too (the same dance the `xrandr` CLI performs under the hood:
+    create a mode of the target size, attach it to the output, point the
+    CRTC at it, then set the screen size). The **order** of those last two
+    steps depends on direction: the CRTC's rectangle can never exceed the
+    *current* screen rectangle at any intermediate step, so shrinking
+    reconfigures the CRTC first (still fits inside the still-large
+    screen) then shrinks the screen to match, while growing sets the
+    screen size first (a no-op for the still-small CRTC) then grows the
+    CRTC to fill it. Getting this backwards fails silently-ish with a
+    generic protocol error that doesn't obviously point at "wrong order."
 
 ## Non-goals
 

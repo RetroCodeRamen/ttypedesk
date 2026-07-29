@@ -172,6 +172,43 @@ func TestBridgeSurfaceCloseIsIdempotentAndCleansUp(t *testing.T) {
 	}
 }
 
+// TestBridgeSurfaceResizeGrowsScreenViaRandr covers the perf follow-up from
+// docs/gui-bridge.md: growing a window well past the overscan-padded
+// capture buffer should trigger a real RANDR SetScreenSize (growScreen),
+// not just leave the guest painting at its original resolution forever.
+func TestBridgeSurfaceResizeGrowsScreenViaRandr(t *testing.T) {
+	requireX11(t, "xclock")
+
+	b, err := New("t-grow", "xclock", 10, 5)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer b.Close()
+
+	if !b.randrOK {
+		t.Skip("RANDR not available on this Xvfb build")
+	}
+
+	origW, origH := b.capW, b.capH
+
+	b.Resize(200, 100) // well past the overscan-padded initial buffer
+
+	deadline := time.Now().Add(resizeDebounce + 2*time.Second)
+	for time.Now().Before(deadline) {
+		b.mu.Lock()
+		w, h := b.capW, b.capH
+		b.mu.Unlock()
+		if w > origW || h > origH {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	b.mu.Lock()
+	w, h := b.capW, b.capH
+	b.mu.Unlock()
+	t.Errorf("capture buffer never grew past %dx%d after resizing to 200x100 cells (still %dx%d)", origW, origH, w, h)
+}
+
 func TestNewFailsClearlyWithoutXvfb(t *testing.T) {
 	if _, err := exec.LookPath("Xvfb"); err == nil {
 		t.Skip("Xvfb is on PATH in this environment; this test wants it absent")
