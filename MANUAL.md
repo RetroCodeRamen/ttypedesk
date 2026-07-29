@@ -1,0 +1,410 @@
+# TTYPE Desk — the manual
+
+The README gets you installed and oriented. This is the deep dive: every
+subsystem, what it actually does, how the pieces fit together, and where to
+look in the repo if you want to go further. If you'd rather read this
+in-desktop, there's also a shorter, task-focused version built in — Start ▸
+System ▸ Manual — but this document covers more ground and doesn't require
+the desktop to be running.
+
+## Contents
+
+- [Windows & the window manager](#windows--the-window-manager)
+- [Taskbar & Start menu](#taskbar--start-menu)
+- [Command palette](#command-palette)
+- [Desktop icons, wallpaper & themes](#desktop-icons-wallpaper--themes)
+- [Files](#files)
+- [Settings](#settings)
+- [Calendar](#calendar)
+- [App Store](#app-store)
+- [Notifications](#notifications)
+- [Terminal features](#terminal-features)
+- [GUI–TUI App Bridge](#guitui-app-bridge)
+- [Remote attach](#remote-attach)
+- [Config, versioning & the stability policy](#config-versioning--the-stability-policy)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## Windows & the window manager
+
+Every window — a real PTY program, a native app, or a bridged GUI app — is a
+`Surface` (`internal/surface`) hosted in a floating window the WM (
+`internal/server`) owns: position, size, focus, z-order, minimize/maximize
+state. The surface itself only knows how to produce a cell grid and consume
+input; it doesn't know it's in a window at all.
+
+- **Move**: drag the title bar, or `Alt+Arrows`.
+- **Resize**: drag any edge or corner (not just bottom-right — full 1-cell
+  hit-test border), or `Alt+Shift+Arrows`.
+- **Snap**: `Alt+Ctrl+Arrows` tiles to a half of the desktop; press the same
+  direction again to restore the pre-snap geometry.
+- **Maximize**: double-click the title bar, or the taskbar-style maximize
+  button in the chrome.
+- **Minimize**: `Ctrl+M`, or the minimize button — the window drops to a
+  taskbar chip and stops receiving redraws until restored.
+- **Focus**: click anywhere in a window, or `Alt+Tab` to cycle.
+- **Close**: `Ctrl+W`, or the window's close button. PTY windows send the
+  child process a clean shutdown, not a hard kill.
+- **Attention**: a PTY window that rings the terminal bell (`\a`) while
+  unfocused gets its taskbar chip flashed yellow until you focus it — the
+  same idea as a browser tab title blinking, driven by libvterm's bell
+  callback (`internal/vterm`).
+- **Persistence**: window geometry (position, size, minimized/maximized
+  state) is saved into `~/.config/ttypedesk/session.json` and restored on
+  next launch by default (Settings → Desktop → "restore last session").
+  `open_terminal_on_start` controls whether a fresh shell also opens
+  alongside whatever session gets restored.
+
+Resizing a PTY window updates the underlying pty's `TIOCSWINSZ` continuously
+while you drag, not just on release — programs like `vim`/`htop` reflow
+live, the same as a real terminal emulator.
+
+## Taskbar & Start menu
+
+The taskbar can dock to any of the four edges (Settings → Appearance,
+`taskbar.dock` in config) — default is top, matching the classic Windows
+layout in the screenshots below. It shows, left to right (or top to bottom
+on a vertical dock): the Start button, one chip per open window (click to
+focus/restore, drag reorders), and a tray with the notification bell and
+clock (click the clock to jump straight to Calendar).
+
+<p align="center">
+  <img src="images/start-menu.png" alt="Start menu open, showing Programs / System / Quit" width="640">
+</p>
+
+**Start menu** (`F10` / `Ctrl+Esc` by default — `Alt+Space` is legacy and
+often intercepted by the host terminal):
+
+- **Programs** — Notes, Calendar, Clock, Image Viewer, plus any app you've
+  added with `menu: programs` (via Add Program or the App Store).
+- **System** — Terminal, Files, Settings, Manual, System folder, Add
+  Program, Manage Programs, plus `menu: system` apps.
+- **App Store** — see [App Store](#app-store) below.
+- **Quit**.
+
+Mouse: hover a row with a `▶` to open its flyout, click a leaf to launch.
+Keyboard: `↑↓` to move, `→`/`Enter` into a submenu, `←`/`Esc` back out.
+
+**Add Program…** registers a custom launcher: a desk name, a command (any
+`LaunchAction` string — a shell command, `pty:`, `bridge:`, `role:`, …), an
+optional emoji, which Start menu folder it lives in, and an optional
+desktop shortcut. **Manage Programs…** lists everything you've added for
+deletion (which also drops its desktop shortcut if it has one).
+
+## Command palette
+
+The palette (`Ctrl+Space` / `Ctrl+P`) is the power-user path — type instead
+of navigating menus. It's not a fuzzy app launcher bolted onto the desktop;
+it's meant to be a genuinely faster way to drive the whole thing.
+
+<p align="center">
+  <img src="images/palette.png" alt="Command palette open with fuzzy results" width="640">
+</p>
+
+Queries parse loosely as `verb rest`:
+
+| Query | What happens |
+|---|---|
+| `open notes` / `notes` | Launch or focus Notes |
+| `find readme` | Fuzzy file search / scrollback find |
+| `calculate 0xff * 16` (or `= 2**10`) | Inline integer expression; Enter copies the result |
+| `run htop` | Opens a PTY window running `htop` |
+| `ssh myserver` | Opens a PTY window running `ssh myserver` |
+| `wifi connect` | Runs whatever `recipes` entry matches, if configured |
+
+Unrecognized text falls back to fuzzy-matching against app titles, desktop
+icons, Start menu programs, and open windows ("focus terminal"). Recipes
+(`recipes` in config) are your own shortcuts — a match string, an action,
+and an optional `confirm: true` that makes the palette require a second
+Enter before running it (useful for anything that shells out to `sudo`).
+History persists across restarts (`palette_history.json`); with an empty
+query, the palette shows your recent picks first.
+
+Settings → Input can remap the palette/Start hotkeys, and there's a
+"replace Start with palette" toggle for people who want one chord for
+everything (`palette.start_opens_palette`).
+
+## Desktop icons, wallpaper & themes
+
+Desktop icons are config data (`desktop_icons` — label, optional
+emoji/icon, `X`/`Y` cell position, launch action), not a hardcoded list —
+drag one to reposition, and the new position is saved. `Icon` is just a
+string: an emoji renders as-is; leave it blank (or turn on
+Settings → Input → ASCII icon substitutes) to use `■`-style stand-ins
+instead, for terminals/fonts that don't render emoji glyphs.
+
+Wallpaper modes (Settings → Appearance, or `wallpaper.*` in config):
+
+- `solid` — a flat color.
+- `pattern` — a repeating single character/emoji across the desktop.
+- `image` — any picture, downsampled through the same truecolor half-block
+  encoder (`internal/gfx`) every graphical surface in the desktop uses,
+  fit `cover`/`contain`/`stretch`. Five built-ins ship as `builtin:<id>`,
+  each paired with a full theme (chrome colors + wallpaper): **XP**
+  (Bliss, the default — see the screenshots on this page), **Scarlet**,
+  **Bumble**, **Bubble**, **Sprout**. Switch instantly from Settings or the
+  palette (`scarlet`, `bumble`, …) — picks apply and save immediately, no
+  separate save step.
+
+Over SSH, `wallpaper.ssh_mode` defaults to forcing solid — redrawing a
+bitmap wallpaper every frame over a laggy link is a bad trade; set it to
+`keep` if you'd rather keep the real wallpaper remotely anyway.
+
+## Files
+
+The native Files app (`apps/files`, Start ▸ System ▸ Files, or a desktop
+icon) is a real folder manager, not a picker dialog: list/grid views, a
+scrollbar, mkdir, rename, cut/copy/paste, and a trash (not a hard delete).
+Opening a file routes through the same association rules `ctx.OpenPath`
+uses everywhere else in the desktop (desktop icons, the palette's `find`,
+Add Program's file browser):
+
+| File kind | Opens with |
+|---|---|
+| Text extensions | `Roles.Editor` (`nano` by default) |
+| Images (`png`/`jpg`/`jpeg`/`gif`/`webp`/`bmp`) | `Roles.Image` (Image Viewer) |
+| Anything else unmapped | A notification telling you no default app is set — never a silent no-op |
+
+Per-extension overrides live under `associations` in config (e.g.
+`"md": "pty:nvim"`); unmapped ones fall through to `role:editor`/
+`role:image` so changing your editor role updates every text association
+at once. Settings → Default apps has one-click editor cycling (nano / nvim
+/ vim / emacs) plus a reset-to-defaults button. An App Store app can also
+take over the Files role entirely via `set_role: filemgr` (see
+[App Store](#app-store)) — Start ▸ Files, desktop icons, and "open this
+folder" all redirect to it until you revert the role in Settings.
+
+## Settings
+
+A real control panel (native `uiapp`, not hand-edited JSON), reachable from
+Start ▸ System ▸ Settings, the palette, or `settings` on the command line
+of the config path. Every change applies and saves immediately — no
+separate Save step, no "are you sure you want to discard changes."
+
+<p align="center">
+  <img src="images/settings.png" alt="Settings app open over the desktop" width="640">
+</p>
+
+| Section | Covers |
+|---|---|
+| **Appearance** | Wallpaper mode/path/fit, taskbar dock edge, theme packs |
+| **Desktop** | Icons on/off, SSH solid-wallpaper override, session restore / open-terminal-on-start, autostart list |
+| **Terminal** | Shell, scrollback size, FPS (separate local vs. SSH budgets) |
+| **Notifications** | Banners on/off, auto-dismiss timing, SSH badge-only mode, a test-notification button |
+| **Default apps** | Editor/image/file-manager/browser roles, association overrides |
+| **Apps** | Add/Manage Programs, a summary of what each role currently points at, System folder shortcut |
+| **Input** | Remappable hotkeys, Start-opens-palette toggle, ASCII icon substitutes |
+| **Advanced** | Log file path (+ open-log shortcut), config file paths, the FPS actually in effect right now |
+
+Config is additive-only as a matter of policy once the project hits 1.0 —
+see [Config, versioning & the stability policy](#config-versioning--the-stability-policy).
+
+## Calendar
+
+Click the taskbar clock, or open it from Start/the palette. Month view plus
+a day agenda; create and edit local events directly (no account needed for
+this part). Reminders don't have their own bespoke toast UI — they post
+into the same desktop-wide [notification service](#notifications)
+everything else uses, so a Calendar reminder looks and behaves exactly like
+any other notification. (Google/Microsoft account sync is on the roadmap,
+not shipped yet — see `ROADMAP.md`.)
+
+## App Store
+
+Start ▸ App Store installs extra apps from configured GitHub catalogs — the
+default is [ttypedesk-apps](https://github.com/RetroCodeRamen/ttypedesk-apps).
+No app-specific logic lives in the desktop binary itself; the App Store is
+a generic engine that fetches a catalog's `index.json`, runs each entry's
+`detect` check to see what's already installed, and installs the rest on
+request.
+
+- **Install** downloads the entry's install script and runs it via
+  `pty:bash <script>` in a real terminal window — interactive, unsandboxed,
+  same trust model as running any command yourself (it may prompt for a
+  sudo password right there in the window).
+- **Trust**: entries from a source you haven't trusted yet show
+  `⚠ unverified source`. The first Enter/click arms a warning instead of
+  installing; a second confirms and trusts that source going forward
+  (persisted to config). The default catalog ships pre-trusted.
+- Once `detect` passes (checked every ~2s while installing), the entry
+  flips to **Installed**, its launcher(s) register into Start ▸ Programs
+  automatically, and a notification fires. A newly-registered app never
+  silently overwrites an unrelated existing program that happens to share
+  its name — it gets a `-store` suffix instead so both coexist.
+- An entry can optionally set `set_role` to replace a built-in app (file
+  manager, editor, browser, terminal, image viewer) desk-wide, not just add
+  itself to the menu — see [Files](#files) for what that looks like from
+  the user side, and `docs/appstore.md` for the full catalog format if
+  you're writing your own.
+
+Add more sources under `app_sources` in config to pull from additional
+catalogs.
+
+## Notifications
+
+A desktop-wide service (`internal/notify`) — any app can post to it
+(Calendar reminders, Settings' test button, App Store install completions,
+future apps), and it's not owned by any one of them. A banner pops near the
+taskbar and auto-dismisses; the tray bell (`🔔`, with an unread badge)
+opens the Notification Center for anything you missed or want to review
+again. Settings controls banner visibility, auto-dismiss timing, and an
+SSH-specific "badge only, no popup" mode for links where a banner mid-frame
+would just be noise. Session history can optionally persist to
+`notifications.json` across restarts.
+
+## Terminal features
+
+Every PTY window is a real terminal, not a toy: full VT100/xterm parsing
+via a vendored libvterm (`third_party/libvterm-0.3.3`, wrapped by
+`internal/vterm`), not a reimplementation.
+
+- **Copy-mode** (`F8`) — keyboard-driven scrollback selection, tmux-style:
+  `hjkl`/arrows move (scrolling into history at the edges), `g`/`G` jump to
+  top/bottom, `Space`/`v` starts a selection, `Enter`/`y` copies it, `Esc`/
+  `q` cancels. Reuses the same render/copy path as mouse selection.
+  Mouse selection also works directly: drag to select (or `Shift+drag` if
+  the program underneath has its own mouse mode enabled), and a selection
+  auto-copies on mouse-up.
+- **Scrollback search** — `F3` / `Alt+/` (or `Ctrl+Shift+F` if your host
+  terminal doesn't steal it first) opens a find bar; `Enter`/`Shift+Enter`
+  jump between matches with yellow highlights.
+- **Scrollback scrollbar** — wheel scrolls, or drag the thumb/click the
+  track on the right border; a visible indicator shows how far back you
+  are.
+- **Clipboard** — OSC 52 (works over SSH without any host-side clipboard
+  tool) with `wl-copy`/`xclip`/`xsel` fallbacks for local sessions.
+  `Ctrl+Shift+C` copies the current selection explicitly;
+  middle-click/`Ctrl+V` pastes.
+
+## GUI–TUI App Bridge
+
+The Bridge (`internal/bridge`) is how a real, unmodified X11 GUI
+application ends up rendered as a window inside the desktop, using the same
+technique Browsh popularized for web pages — off-screen capture → cell
+grid → floating window — generalized to arbitrary X11 apps instead of just
+a browser engine (TTYPE Desk doesn't embed or depend on Browsh itself).
+
+Launch one with `bridge:<command>` as a launch action — a desktop icon, an
+Add Program command, or straight from the palette (`bridge:firefox`,
+`bridge:gimp`, any X11 app). Under the hood:
+
+- A dedicated, private `Xvfb` spawns per bridged window (nested — X11
+  needed only for this feature, nothing else in the desktop touches it).
+  `Xvfb` is a soft dependency: not having it installed only breaks
+  `bridge:` windows, nothing else.
+- The guest app renders into that virtual display; the Bridge reads it back
+  via X11's `GetImage` and encodes it through the exact same half-block
+  cell encoder (`internal/gfx`) that wallpaper images and the Image Viewer
+  use — no separate graphics path.
+- Input goes back the other direction over X11's **XTest** extension —
+  keys and clicks/scroll translate from cell coordinates to the guest's
+  pixel space.
+- **Text legibility**: raw pixels alone can't distinguish text from any
+  other content — a text-heavy app degrades into colored noise with every
+  cell using the same glyph. For native GTK/Qt apps, the Bridge also walks
+  the Linux accessibility tree (AT-SPI2, over a private per-window D-Bus
+  session) and overlays real characters on top of the raster wherever it
+  finds real text — validated against `zenity`/`gtk3-demo`. This doesn't
+  help Electron-based apps (Cursor/VS Code and similar) — confirmed
+  directly, and it matches a known open upstream Chromium/Electron
+  accessibility bug, not a Bridge limitation. Entirely optional and
+  non-fatal: without `dbus`/`at-spi2-core` installed, or against an app
+  that doesn't expose usable text, bridged windows just stay raster-only,
+  exactly as if this feature didn't exist.
+- **Perf**: the live capture buffer is deliberately sized with headroom
+  beyond the window's current size (so small resizes don't need a full
+  Xvfb resize), the capture cadence adapts down automatically over SSH
+  when a frame gets expensive to produce, and growing a window past that
+  headroom triggers a live RANDR resize of the virtual screen instead of
+  just upscaling a fixed-resolution buffer forever.
+
+Not every GUI-adjacent idea lives here: **RemoteNest** (RDP/VNC into the
+same path) was evaluated and dropped — the only well-maintained Go RDP
+client is GPL-3.0-licensed, which isn't a tradeoff worth making for this
+feature. **BrowserNest**, a dedicated headless-browser backend, was
+dropped too — `bridge:firefox` through the generic path above already
+covers "browse the web" without a second, narrower implementation.
+
+## Remote attach
+
+A thin remote session, distinct from SSHing into a shell and running
+`ttypedesk` there yourself (which also works fine, and is the simpler
+option if you just want the whole desktop remotely):
+
+```bash
+# on the machine actually running the desktop
+./bin/ttypedesk -listen /tmp/ttypedesk.sock
+
+# from anywhere else with access to that socket
+./bin/ttypedesk -attach /tmp/ttypedesk.sock
+```
+
+The attach client forwards keyboard and mouse (press/drag/release/wheel)
+to whatever's focused/on-screen on the host, and renders the content of
+each window it's told about. `Ctrl+Q` detaches cleanly. Window chrome —
+dragging, resizing, the taskbar, the Start menu — stays host-side only;
+this is a content-forwarding session, not a second seat at the same
+desktop. Wire format today is JSON cell snapshots; a binary cell-diff
+framing (less bandwidth, especially over SSH) is planned — see
+`ROADMAP.md` and `docs/ssh.md` for the streaming-over-SSH notes generally.
+
+## Config, versioning & the stability policy
+
+`~/.config/ttypedesk/config.json` holds everything: theme, taskbar dock,
+desktop icons, wallpaper, notifications, associations, App Store sources,
+Files options, hotkeys, recipes. It's hot-reloaded — edit it by hand, let a
+sync tool write it, or run a second instance pointed at the same file, and
+the running desktop picks up the change within about two seconds, live,
+no restart.
+
+Versioning is `MAJOR.MINOR.YYMMNN` (e.g. `0.4.260735`): `MAJOR.MINOR` is
+hand-bumped in `VERSION`, `YYMMNN` is year + month + a running count of
+commits so far that calendar month, computed by `scripts/version.sh` and
+baked into the binary at build time. `ttypedesk -version` prints what's
+actually running. Every commit gets auto-tagged (`v0.4.260735`, …) via a
+`post-commit` git hook.
+
+Major version `0` means no compatibility promises yet — config shape and
+internal APIs can still move. Once major hits `1`, two specific surfaces
+stop moving casually:
+
+- **`config.json`** stays additive-only — new fields always ship with a
+  safe zero-value default so an old config keeps loading, existing
+  field names/types don't change, nothing gets silently repurposed.
+- **The App SDK** (`pkg/uiapp` — `App`, `Host`, `Context`, `Canvas`, the
+  interface every native app is written against, built-in or third-party)
+  gets the same treatment.
+
+Everything else — internal packages, the App Store catalog format, CLI
+flags — can still change after 1.0; those were never the stability
+contract.
+
+## Troubleshooting
+
+TTYPE Desk is a desktop environment hand-rolled inside a terminal emulator,
+which is itself usually inside another terminal emulator. Something will
+eventually go sideways, and when it does it leaves a note instead of
+quietly dying:
+
+- **Log file**: `~/.config/ttypedesk/ttypedesk.log` (override with
+  `$TTYPEDESK_LOG`). Panics and launch-action failures land here — check
+  this first when something freezes or a window won't open.
+  `$TTYPEDESK_LOG_LEVEL` (`debug`/`info`/`warn`/`error`, default `info`)
+  controls verbosity.
+- **App crashes are isolated**: a panicking native app shows a red crash
+  screen inside its own window (`Esc`/`Q` closes it) instead of taking the
+  whole desktop down. The main event/draw loop itself also recovers from a
+  panic and keeps going where it can — one misbehaving window shouldn't
+  cost you every other one.
+- **Colors look wrong / wallpaper looks flat**: your host terminal likely
+  isn't advertising truecolor. Set `COLORTERM=truecolor` (most modern
+  terminals support this; some need it set explicitly).
+- **A hotkey does nothing**: several defaults (`Alt+Space`, `Ctrl+Shift+F`)
+  are commonly intercepted by host terminals or window managers before
+  they ever reach TTYPE Desk. Use the documented alternate binding (`F10`/
+  `Ctrl+Esc`, `F3`/`Alt+/`) or remap it in Settings → Input.
+  `bridge:` windows need `Xvfb` on `PATH`; the AT-SPI text overlay
+  additionally wants `dbus-daemon` + `at-spi2-registryd`
+  (`at-spi2-core`) — both are soft dependencies, so their absence degrades
+  the specific feature rather than failing to start.

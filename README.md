@@ -10,7 +10,37 @@
 
 Somewhere around the fourth time I alt-tabbed between six `tmux` panes and thought *"this would be so much nicer with a title bar,"* I decided the correct fix was obviously to build an entire draggable, resizable, taskbar-having window manager — inside the terminal I was already complaining about. This is that. No X11, no Wayland, no compositor. Just cells, glyphs, and a truecolor terminal that has agreed to pretend very hard.
 
-**TTYPE Desk** multiplexes real TUI programs (bash, vim, htop — anything with a PTY) via **libvterm**, hosts native apps through an in-process **App SDK**, and can render images as truecolor half-block “graphics,” because if you're going to commit to the bit, you might as well be able to open a JPEG in it too. Draggable windows, a Start menu, a taskbar, scrollback, a command palette — everything a desktop needs, none of what it doesn't (a compositor, a display server, or any right to exist).
+**TTYPE Desk** multiplexes real TUI programs (bash, vim, htop — anything with a PTY) via **libvterm**, hosts native apps through an in-process **App SDK**, bridges in real X11 GUI apps as floating windows, and can render images as truecolor half-block "graphics," because if you're going to commit to the bit, you might as well be able to open a JPEG in it too. Draggable windows, a Start menu, a taskbar, a command palette, a full control panel — everything a desktop needs, none of what it doesn't (a compositor, a display server, or any right to exist).
+
+**Want the deep dive instead of the tour?** → [MANUAL.md](MANUAL.md) covers every subsystem in detail. This README is the highlight reel.
+
+## The tour
+
+Start menu, opened the normal way — hover for flyouts, click to launch:
+
+<p align="center">
+  <img src="images/start-menu.png" alt="Start menu open with Programs / System / Quit" width="640">
+</p>
+
+The command palette — type instead of navigating, because menus are for people with time to spare:
+
+<p align="center">
+  <img src="images/palette.png" alt="Command palette with fuzzy results" width="640">
+</p>
+
+A real control panel. Every change applies and saves instantly — there is no Save button to forget to click:
+
+<p align="center">
+  <img src="images/settings.png" alt="Settings app open over the desktop" width="640">
+</p>
+
+And yes, it's an actual window manager — drag, stack, focus, resize, three windows deep, real colored terminal output and all:
+
+<p align="center">
+  <img src="images/multi-window.png" alt="Three stacked windows — Settings, Notes, and a real bash session" width="640">
+</p>
+
+There's also a GUI–TUI Bridge that renders real, unmodified X11 apps as windows in the desktop (`bridge:firefox`, `bridge:gimp`, genuinely anything), a folder manager, a Calendar, an App Store, and a notification center. [MANUAL.md](MANUAL.md) has the full tour; keep reading here for the parts you actually need to get it running.
 
 ## Requirements
 
@@ -91,6 +121,9 @@ That's it. No installer wizard, no EULA, no "would you like to also install a br
 | Ctrl+M | Minimize focused window |
 | Ctrl+Q | Quit |
 
+Full keybinding rationale, every Settings section, and how each subsystem
+actually works: [MANUAL.md](MANUAL.md).
+
 ### Start menu
 
 Yes, it's in the corner. Yes, clicking it does what you think. We know exactly what we're doing.
@@ -116,6 +149,8 @@ Log file (panics, deadlocks, app crashes): `~/.config/ttypedesk/ttypedesk.log`
 Override with `TTYPEDESK_LOG=/path/to/file` or `TTYPEDESK_LOG_LEVEL=debug`.
 
 Native app panics are isolated to that window (red crash screen; Esc/Q closes it) instead of taking the whole desktop down with them. The main event/draw loop also recovers and keeps going when possible, because one misbehaving `htop` window is not a reason to lose your other twelve.
+
+More troubleshooting (and more of everything else): [MANUAL.md](MANUAL.md#troubleshooting).
 
 ```bash
 ./bin/ttypedesk                     # default shell terminal
@@ -156,14 +191,14 @@ Keyboard and mouse (press/drag/release/wheel) forward to the host; window chrome
 
 ## Versioning
 
-`MAJOR.MINOR.YYMMNN` — e.g. `0.3.260722`. `MAJOR.MINOR` lives in [VERSION](VERSION)
+`MAJOR.MINOR.YYMMNN` — e.g. `0.4.260735`. `MAJOR.MINOR` lives in [VERSION](VERSION)
 and is bumped by hand; `YYMMNN` is computed by [scripts/version.sh](scripts/version.sh)
 (year, month, and a count of commits so far this calendar month) and baked
 into the binary at build time (`./build.sh`, or `ttypedesk -version` to
 check what's running). Still `0` for major — no compatibility promises yet,
 config shape and internal APIs are still moving.
 
-Every commit gets tagged automatically (`v0.3.260722`, …) via a `post-commit`
+Every commit gets tagged automatically (`v0.4.260735`, …) via a `post-commit`
 hook once `core.hooksPath` points at [.githooks](.githooks) — `./build.sh`
 sets that the first time you run it in a fresh clone.
 
