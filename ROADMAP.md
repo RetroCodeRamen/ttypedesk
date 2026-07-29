@@ -222,7 +222,7 @@ Avoid building around Discord/Slack as the primary path (proprietary APIs / ToS)
 ## Remote attach
 
 - [x] Bidirectional attach (input over socket) — keyboard to focused window; mouse press/drag/release/wheel hit-tests and forwards into content area, focusing on press. Window chrome (drag/resize/taskbar/Start menu) still local-only.
-- [ ] Binary cell-diff framing (replace JSON snapshots)
+- [x] Binary cell-diff framing (replace JSON snapshots) — `internal/proto`: length-prefixed `WriteFrame`/`ReadFrame` (4-byte length + type byte), `DiffFrame`/`DiffWindow` binary encoding (~15 bytes/cell vs ~70-90 for JSON). Window metadata sent every frame; each connection tracks its own last-sent cell grid per window and only re-sends a window's cells when they've actually changed since that connection last saw them — closed windows get pruned from the cache. Input (key/mouse/attach/detach) stays JSON, now wrapped in the same frame envelope (`FrameJSON`) instead of newline-delimited.
 
 ## Audio streaming (later — after main desktop)
 

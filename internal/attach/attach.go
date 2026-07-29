@@ -15,8 +15,10 @@ import (
 	"github.com/ttypedesk/ttypedesk/pkg/cell"
 )
 
-// Serve listens on a Unix socket and streams snapshot JSON lines to clients,
-// reading key/mouse input back from them in the other direction.
+// Serve listens on a Unix socket and streams binary cell-diff frames to
+// clients, reading key/mouse input back from them in the other
+// direction. See internal/proto's FrameJSON/FrameDiff doc comment for
+// the wire framing.
 func Serve(srv *server.Server, path string) error {
 	_ = os.Remove(path)
 	ln, err := net.Listen("unix", path)
@@ -36,22 +38,70 @@ func Serve(srv *server.Server, path string) error {
 func handleConn(srv *server.Server, conn net.Conn) {
 	defer conn.Close()
 	hello, _ := proto.Encode(proto.TypeAttach, "", map[string]any{"role": "snapshot"})
-	_, _ = conn.Write(append(hello, '\n'))
+	if err := proto.WriteFrame(conn, proto.FrameJSON, hello); err != nil {
+		return
+	}
 
 	go readInput(srv, conn)
 
+	// lastCells is this connection's own view of what it's already been
+	// sent, per window — never shared with another attached client or
+	// with the local render loop, so multiple simultaneous attachments
+	// (or attach alongside local rendering) never fight over what counts
+	// as "already sent."
+	lastCells := make(map[string][]cell.Cell)
 	ticker := time.NewTicker(time.Second / 10)
 	defer ticker.Stop()
 	for range ticker.C {
 		snap := srv.Snapshot()
-		msg, err := proto.Encode(proto.TypeSnapshot, "", snap)
-		if err != nil {
-			return
-		}
-		if _, err := conn.Write(append(msg, '\n')); err != nil {
+		frame := buildDiffFrame(snap, lastCells)
+		if err := proto.WriteFrame(conn, proto.FrameDiff, proto.EncodeDiffFrame(frame)); err != nil {
 			return
 		}
 	}
+}
+
+// buildDiffFrame converts a full Snapshot into a DiffFrame for one
+// connection: window metadata is always included (cheap), but a
+// window's cell grid is only included if it changed since the last
+// frame built with this same lastCells cache — which this function
+// updates in place, including pruning entries for windows that have
+// since closed (unbounded growth over a long attach session otherwise).
+func buildDiffFrame(snap proto.Snapshot, lastCells map[string][]cell.Cell) proto.DiffFrame {
+	seen := make(map[string]bool, len(snap.Windows))
+	f := proto.DiffFrame{Cols: snap.Cols, Rows: snap.Rows}
+	for _, w := range snap.Windows {
+		seen[w.ID] = true
+		dw := proto.DiffWindow{
+			ID: w.ID, Title: w.Title,
+			X: w.X, Y: w.Y, W: w.W, H: w.H, Z: w.Z,
+			Focused: w.Focused, Maximized: w.Maximized, Kind: w.Kind,
+			Cols: w.Cols, Rows: w.Rows,
+		}
+		if !cellsEqual(lastCells[w.ID], w.Cells) {
+			dw.Cells = w.Cells
+			lastCells[w.ID] = w.Cells
+		}
+		f.Windows = append(f.Windows, dw)
+	}
+	for id := range lastCells {
+		if !seen[id] {
+			delete(lastCells, id)
+		}
+	}
+	return f
+}
+
+func cellsEqual(a, b []cell.Cell) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // readInput consumes key/mouse envelopes sent back by an attached client and
@@ -62,12 +112,17 @@ func handleConn(srv *server.Server, conn net.Conn) {
 // taskbar/Start menu) is intentionally not remoted yet — v1 covers typing
 // and interacting with whatever's already focused or on screen.
 func readInput(srv *server.Server, conn net.Conn) {
-	scanner := bufio.NewScanner(conn)
-	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
-
+	r := bufio.NewReader(conn)
 	var downID string
-	for scanner.Scan() {
-		env, err := proto.Decode(scanner.Bytes())
+	for {
+		typ, payload, err := proto.ReadFrame(r)
+		if err != nil {
+			return
+		}
+		if typ != proto.FrameJSON {
+			continue
+		}
+		env, err := proto.Decode(payload)
 		if err != nil {
 			continue
 		}
@@ -151,7 +206,7 @@ func dispatchRemoteMouse(srv *server.Server, ev proto.MouseEvent, downID *string
 	}
 }
 
-// RunViewer attaches to a socket, paints snapshots, and forwards local
+// RunViewer attaches to a socket, paints diff frames, and forwards local
 // keyboard/mouse input back to the host desktop. Ctrl+Q detaches.
 func RunViewer(path string) error {
 	conn, err := net.Dial("unix", path)
@@ -181,21 +236,27 @@ func RunViewer(path string) error {
 		}
 	}()
 
-	scanner := bufio.NewScanner(conn)
-	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
-
-	lines := make(chan []byte, 4)
+	r := bufio.NewReader(conn)
+	type wireFrame struct {
+		typ     byte
+		payload []byte
+	}
+	frames := make(chan wireFrame, 4)
 	go func() {
-		for scanner.Scan() {
-			b := append([]byte(nil), scanner.Bytes()...)
+		for {
+			typ, payload, err := proto.ReadFrame(r)
+			if err != nil {
+				close(frames)
+				return
+			}
 			select {
-			case lines <- b:
+			case frames <- wireFrame{typ, payload}:
 			default:
 			}
 		}
-		close(lines)
 	}()
 
+	lastCells := make(map[string][]cell.Cell)
 	var mouseDown bool
 	for {
 		select {
@@ -240,19 +301,18 @@ func RunViewer(path string) error {
 					sendEnvelope(conn, proto.TypeMouse, me)
 				}
 			}
-		case line, ok := <-lines:
+		case fr, ok := <-frames:
 			if !ok {
 				return fmt.Errorf("connection closed")
 			}
-			env, err := proto.Decode(line)
-			if err != nil || env.Type != proto.TypeSnapshot {
-				continue
+			if fr.typ != proto.FrameDiff {
+				continue // FrameJSON here is just the initial "attach" hello
 			}
-			snap, err := proto.DecodePayload[proto.Snapshot](env)
+			df, err := proto.DecodeDiffFrame(fr.payload)
 			if err != nil {
 				continue
 			}
-			paintSnapshot(screen, snap)
+			paintDiffFrame(screen, df, lastCells)
 		}
 	}
 }
@@ -262,7 +322,7 @@ func sendEnvelope(conn net.Conn, typ proto.MessageType, payload any) {
 	if err != nil {
 		return
 	}
-	_, _ = conn.Write(append(msg, '\n'))
+	_ = proto.WriteFrame(conn, proto.FrameJSON, msg)
 }
 
 // remoteKeyEvent maps a tcell key event to a wire KeyEvent, mirroring the
@@ -318,29 +378,46 @@ func remoteKeyEvent(e *tcell.EventKey) (proto.KeyEvent, bool) {
 	return ev, true
 }
 
-func paintSnapshot(screen tcell.Screen, snap proto.Snapshot) {
+// paintDiffFrame renders one DiffFrame to screen. lastCells is the
+// client's own cache, keyed by window ID: a window with Cells == nil
+// this frame (unchanged since the last one that included them) reuses
+// whatever's cached; a window with real Cells updates the cache. Also
+// prunes cache entries for windows no longer present (closed host-side).
+func paintDiffFrame(screen tcell.Screen, f proto.DiffFrame, lastCells map[string][]cell.Cell) {
 	screen.Clear()
 	style := func(fg, bg cell.Color) tcell.Style {
 		return tcell.StyleDefault.
 			Foreground(tcell.NewRGBColor(int32(fg.R), int32(fg.G), int32(fg.B))).
 			Background(tcell.NewRGBColor(int32(bg.R), int32(bg.G), int32(bg.B)))
 	}
-	for _, w := range snap.Windows {
+	seen := make(map[string]bool, len(f.Windows))
+	for _, w := range f.Windows {
+		seen[w.ID] = true
+		cells := w.Cells
+		if cells == nil {
+			cells = lastCells[w.ID]
+		} else {
+			lastCells[w.ID] = cells
+		}
 		for row := 0; row < w.Rows; row++ {
 			for col := 0; col < w.Cols; col++ {
 				i := row*w.Cols + col
-				if i >= len(w.Cells) {
+				if i >= len(cells) {
 					continue
 				}
-				c := w.Cells[i]
+				c := cells[i]
 				x, y := w.X+1+col, w.Y+1+row
 				screen.SetContent(x, y, c.Rune, nil, style(c.FG, c.BG))
 			}
 		}
-		// simple title
 		title := w.Title
 		for i, r := range title {
 			screen.SetContent(w.X+1+i, w.Y, r, nil, style(cell.RGB(255, 255, 255), cell.RGB(0, 0, 170)))
+		}
+	}
+	for id := range lastCells {
+		if !seen[id] {
+			delete(lastCells, id)
 		}
 	}
 	msg := " TTYPE Desk remote attach — Ctrl+Q detach "

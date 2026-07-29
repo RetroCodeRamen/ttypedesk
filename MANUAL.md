@@ -453,9 +453,14 @@ to whatever's focused/on-screen on the host, and renders the content of
 each window it's told about. `Ctrl+Q` detaches cleanly. Window chrome —
 dragging, resizing, the taskbar, the Start menu — stays host-side only;
 this is a content-forwarding session, not a second seat at the same
-desktop. Wire format today is JSON cell snapshots; a binary cell-diff
-framing (less bandwidth, especially over SSH) is planned — see
-`ROADMAP.md` and `docs/ssh.md` for the streaming-over-SSH notes generally.
+desktop. Wire format is a length-prefixed binary framing: window metadata
+(position, size, title, focus) goes out every tick, but a window's cell
+grid is only resent once it actually changes since the last frame that
+connection saw — each attach connection tracks its own diff state, so
+several viewers (or a viewer plus the host's own render loop) never step
+on each other's cache. Cheaper than resending every cell as JSON on every
+tick, which matters most over SSH — see `docs/ssh.md` for the
+streaming-over-SSH notes generally.
 
 ## Config, versioning & the stability policy
 

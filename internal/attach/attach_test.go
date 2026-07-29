@@ -214,7 +214,7 @@ func TestDispatchRemoteMouseDragKeepsExistingDownID(t *testing.T) {
 	}
 }
 
-func TestPaintSnapshot(t *testing.T) {
+func TestPaintDiffFrame(t *testing.T) {
 	screen := tcell.NewSimulationScreen("")
 	if err := screen.Init(); err != nil {
 		t.Fatalf("screen.Init: %v", err)
@@ -222,9 +222,9 @@ func TestPaintSnapshot(t *testing.T) {
 	defer screen.Fini()
 	screen.SetSize(80, 24)
 
-	snap := proto.Snapshot{
+	frame := proto.DiffFrame{
 		Cols: 80, Rows: 24,
-		Windows: []proto.SnapshotWindow{
+		Windows: []proto.DiffWindow{
 			{
 				ID: "w1", Title: "Hi", X: 2, Y: 3, W: 5, H: 4, Cols: 3, Rows: 2,
 				Cells: []cell.Cell{
@@ -235,7 +235,8 @@ func TestPaintSnapshot(t *testing.T) {
 			},
 		},
 	}
-	paintSnapshot(screen, snap)
+	cache := make(map[string][]cell.Cell)
+	paintDiffFrame(screen, frame, cache)
 
 	// Content cell (0,0) of the window lands at (X+1, Y+1).
 	r, _, _, _ := screen.GetContent(3, 4)
@@ -265,6 +266,112 @@ func TestPaintSnapshot(t *testing.T) {
 	r, _, _, _ = screen.GetContent(1, 0)
 	if r != 'T' {
 		t.Errorf("status line rune = %q, want 'T'", r)
+	}
+}
+
+func TestPaintDiffFrameReusesCacheWhenCellsOmitted(t *testing.T) {
+	screen := tcell.NewSimulationScreen("")
+	if err := screen.Init(); err != nil {
+		t.Fatalf("screen.Init: %v", err)
+	}
+	defer screen.Fini()
+	screen.SetSize(80, 24)
+	cache := make(map[string][]cell.Cell)
+
+	first := proto.DiffFrame{Cols: 80, Rows: 24, Windows: []proto.DiffWindow{
+		{ID: "w1", X: 0, Y: 1, W: 4, H: 3, Cols: 2, Rows: 1, Cells: []cell.Cell{{Rune: 'X'}, {Rune: 'Y'}}},
+	}}
+	paintDiffFrame(screen, first, cache)
+
+	// Second frame omits Cells entirely (unchanged) — content must still
+	// be there, painted from the cache.
+	second := proto.DiffFrame{Cols: 80, Rows: 24, Windows: []proto.DiffWindow{
+		{ID: "w1", X: 0, Y: 1, W: 4, H: 3, Cols: 2, Rows: 1, Cells: nil},
+	}}
+	paintDiffFrame(screen, second, cache)
+
+	r, _, _, _ := screen.GetContent(1, 2)
+	if r != 'X' {
+		t.Errorf("cached content (0,0) rune = %q, want 'X'", r)
+	}
+	r, _, _, _ = screen.GetContent(2, 2)
+	if r != 'Y' {
+		t.Errorf("cached content (1,0) rune = %q, want 'Y'", r)
+	}
+}
+
+func TestPaintDiffFramePrunesCacheForClosedWindows(t *testing.T) {
+	screen := tcell.NewSimulationScreen("")
+	if err := screen.Init(); err != nil {
+		t.Fatalf("screen.Init: %v", err)
+	}
+	defer screen.Fini()
+	screen.SetSize(80, 24)
+	cache := make(map[string][]cell.Cell)
+
+	first := proto.DiffFrame{Cols: 80, Rows: 24, Windows: []proto.DiffWindow{
+		{ID: "w1", Cols: 1, Rows: 1, Cells: []cell.Cell{{Rune: 'X'}}},
+	}}
+	paintDiffFrame(screen, first, cache)
+	if _, ok := cache["w1"]; !ok {
+		t.Fatal("cache does not contain w1 after its first frame")
+	}
+
+	// w1 is gone from the second frame (closed host-side) — its cache
+	// entry should be pruned, not linger forever.
+	second := proto.DiffFrame{Cols: 80, Rows: 24}
+	paintDiffFrame(screen, second, cache)
+	if _, ok := cache["w1"]; ok {
+		t.Error("cache still contains w1 after it disappeared from a frame — should have been pruned")
+	}
+}
+
+func TestCellsEqual(t *testing.T) {
+	a := []cell.Cell{{Rune: 'A'}, {Rune: 'B'}}
+	b := []cell.Cell{{Rune: 'A'}, {Rune: 'B'}}
+	c := []cell.Cell{{Rune: 'A'}, {Rune: 'X'}}
+	if !cellsEqual(a, b) {
+		t.Error("cellsEqual(a, b) = false, want true for identical content")
+	}
+	if cellsEqual(a, c) {
+		t.Error("cellsEqual(a, c) = true, want false for differing content")
+	}
+	if cellsEqual(a, nil) {
+		t.Error("cellsEqual(a, nil) = true, want false for differing length")
+	}
+	if !cellsEqual(nil, nil) {
+		t.Error("cellsEqual(nil, nil) = false, want true")
+	}
+}
+
+func TestBuildDiffFrameOmitsUnchangedOnSecondCallAndPrunesClosed(t *testing.T) {
+	cache := make(map[string][]cell.Cell)
+	snap1 := proto.Snapshot{Cols: 80, Rows: 24, Windows: []proto.SnapshotWindow{
+		{ID: "w1", Cols: 1, Rows: 1, Cells: []cell.Cell{{Rune: 'A'}}},
+	}}
+	f1 := buildDiffFrame(snap1, cache)
+	if len(f1.Windows) != 1 || f1.Windows[0].Cells == nil {
+		t.Fatalf("first buildDiffFrame call should include cells: %+v", f1.Windows)
+	}
+
+	// Same content again: cells should be omitted the second time.
+	f2 := buildDiffFrame(snap1, cache)
+	if f2.Windows[0].Cells != nil {
+		t.Errorf("second buildDiffFrame call with unchanged content should omit Cells, got %v", f2.Windows[0].Cells)
+	}
+
+	// Window closes: cache entry should be pruned.
+	snap2 := proto.Snapshot{Cols: 80, Rows: 24}
+	_ = buildDiffFrame(snap2, cache)
+	if _, ok := cache["w1"]; ok {
+		t.Error("cache still contains w1 after it closed — should have been pruned")
+	}
+
+	// A window reopening with the same ID after being pruned must be
+	// treated as new (cells included), not skipped as "unchanged".
+	f3 := buildDiffFrame(snap1, cache)
+	if f3.Windows[0].Cells == nil {
+		t.Error("a reopened window (same ID, pruned from cache) should include cells again, not be treated as unchanged")
 	}
 }
 
@@ -299,13 +406,16 @@ func TestServeEndToEnd(t *testing.T) {
 	conn := dialWithRetry(t, sockPath)
 	defer conn.Close()
 
-	scanner := bufio.NewScanner(conn)
-	scanner.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	r := bufio.NewReader(conn)
 
-	if !scanner.Scan() {
-		t.Fatalf("no hello line: %v", scanner.Err())
+	typ, payload, err := proto.ReadFrame(r)
+	if err != nil {
+		t.Fatalf("read hello frame: %v", err)
 	}
-	hello, err := proto.Decode(scanner.Bytes())
+	if typ != proto.FrameJSON {
+		t.Fatalf("hello frame type = %d, want FrameJSON", typ)
+	}
+	hello, err := proto.Decode(payload)
 	if err != nil {
 		t.Fatalf("decode hello: %v", err)
 	}
@@ -313,22 +423,24 @@ func TestServeEndToEnd(t *testing.T) {
 		t.Fatalf("hello.Type = %q, want %q", hello.Type, proto.TypeAttach)
 	}
 
-	if !scanner.Scan() {
-		t.Fatalf("no snapshot line: %v", scanner.Err())
-	}
-	snapEnv, err := proto.Decode(scanner.Bytes())
+	typ, payload, err = proto.ReadFrame(r)
 	if err != nil {
-		t.Fatalf("decode snapshot: %v", err)
+		t.Fatalf("read diff frame: %v", err)
 	}
-	if snapEnv.Type != proto.TypeSnapshot {
-		t.Fatalf("snapEnv.Type = %q, want %q", snapEnv.Type, proto.TypeSnapshot)
+	if typ != proto.FrameDiff {
+		t.Fatalf("frame type = %d, want FrameDiff", typ)
 	}
-	snap, err := proto.DecodePayload[proto.Snapshot](snapEnv)
+	diff, err := proto.DecodeDiffFrame(payload)
 	if err != nil {
-		t.Fatalf("decode snapshot payload: %v", err)
+		t.Fatalf("decode diff frame: %v", err)
 	}
-	if len(snap.Windows) != 2 {
-		t.Fatalf("snapshot has %d windows, want 2", len(snap.Windows))
+	if len(diff.Windows) != 2 {
+		t.Fatalf("diff frame has %d windows, want 2", len(diff.Windows))
+	}
+	for _, w := range diff.Windows {
+		if w.Cells == nil {
+			t.Errorf("window %q on the first frame sent to a new connection should include cells", w.ID)
+		}
 	}
 
 	// Send a mouse press over window B's content and confirm the host's
