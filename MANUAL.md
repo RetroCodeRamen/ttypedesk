@@ -20,6 +20,7 @@ the desktop to be running.
 - [Notifications](#notifications)
 - [Amp (audio player)](#amp-audio-player)
 - [Vid (video player)](#vid-video-player)
+- [Chat (Matrix messenger)](#chat-matrix-messenger)
 - [Terminal features](#terminal-features)
 - [GUI–TUI App Bridge](#guitui-app-bridge)
 - [Remote attach](#remote-attach)
@@ -325,6 +326,40 @@ happens on Play if you seek while paused too. Frame rate adapts down
 over SSH the same blunt way the Bridge's does today: a fixed lower
 budget (`config.OverSSH()`), not a live-measured one — resolution itself
 doesn't adapt yet.
+
+## Chat (Matrix messenger)
+
+Start ▸ Programs ▸ Chat, or the palette (`chat`). A text-only
+[Matrix](https://matrix.org/) client — TTYPE Desk never runs or manages a
+chat backend of its own; Chat just connects to a homeserver you already
+have an account on (`matrix.org` or any other). Built on
+[mautrix-go](https://github.com/mautrix/go), the same library `gomuks`
+(a real terminal Matrix client) is built on.
+
+First launch shows a login screen: homeserver, username, password.
+**Tab**/arrows move between fields, **Enter** advances (or logs in from
+the password field). Once connected: **Up**/**Down** switch rooms,
+typing composes a message, **Enter** sends it, **Backspace** edits.
+Room names come from the room's own `m.room.name` state, falling back to
+the raw room ID until that arrives. A message landing in any room other
+than the one currently in view posts a desktop notification — not real
+`m.mentions` parsing, just "a message arrived somewhere you're not
+looking," which covers the common case without needing to parse mention
+events specially; your own messages (echoed back by sync, like any
+client sees) and messages in the room already on screen don't notify.
+
+The session token is saved to `~/.config/ttypedesk/credentials/` (never
+the password — that's only ever used for the initial login) so you don't
+re-login every time you open Chat; if the stored token's been revoked or
+expired, Chat quietly falls back to the login screen instead of getting
+stuck.
+
+**E2EE is explicitly not built** — this is Phase 1 (plain Matrix text
+rooms) only. Encryption is a genuinely separate undertaking (device
+verification, key backup, cross-signing) rather than an incremental
+feature, so it stays a distinct future phase rather than something half-
+implemented here. Use unencrypted rooms, or accept that an encrypted
+room's messages won't decrypt in this client.
 
 ## Terminal features
 

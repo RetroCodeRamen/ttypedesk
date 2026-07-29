@@ -13,6 +13,7 @@ import (
 	"github.com/ttypedesk/ttypedesk/apps/amp"
 	"github.com/ttypedesk/ttypedesk/apps/appstore"
 	"github.com/ttypedesk/ttypedesk/apps/calendar"
+	"github.com/ttypedesk/ttypedesk/apps/chat"
 	"github.com/ttypedesk/ttypedesk/apps/clock"
 	"github.com/ttypedesk/ttypedesk/apps/filepicker"
 	"github.com/ttypedesk/ttypedesk/apps/files"
@@ -275,6 +276,8 @@ func (s *Server) launchAction(action string) error {
 		return s.FocusOrCreateApp("amp", "Amp")
 	case "vid":
 		return s.FocusOrCreateApp("vid", "Vid")
+	case "chat":
+		return s.FocusOrCreateApp("chat", "Chat")
 	default:
 		if len(action) > 5 && action[:5] == "open:" {
 			return s.OpenPath(action[5:])
@@ -702,6 +705,11 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 			cc, cr = w-2, h-2
 			surf, err = surface.NewAppSurface(id, "Vid", vid.New(), cc, cr)
 			title = "Vid"
+		case "chat":
+			w, h = 74, 22
+			cc, cr = w-2, h-2
+			surf, err = surface.NewAppSurface(id, "Chat", chat.New(), cc, cr)
+			title = "Chat"
 		case "filepicker":
 			w, h = 56, 18
 			cc, cr = w-2, h-2

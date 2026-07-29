@@ -213,11 +213,11 @@ Alternatives if Matrix is too heavy for v1:
 
 Avoid building around Discord/Slack as the primary path (proprietary APIs / ToS). Bridges into Matrix stay an upstream concern, not ours.
 
-- [ ] **Chat** app — login (HS URL + user + token/password), room list, timeline, send text
-- [ ] Persist session token under `~/.config/ttypedesk/` (not in git)
-- [ ] Notifications for mentions / DMs via system notify service
-- [ ] Phase 1: Matrix text rooms; Phase 2: attachments / reactions as API allows
-- [ ] Design note: keep UI DOS/Win9x-adjacent (status bar, room list | messages), not a web clone
+- [x] **Chat** app — `apps/chat`, using [mautrix-go](https://github.com/mautrix/go); login (homeserver + username + password), room list, timeline, send text
+- [x] Persist session token under `~/.config/ttypedesk/` (not in git) — `internal/credstore`, same store OAuth2 calendar tokens use
+- [x] Notifications for backgrounded-room activity via system notify service — not real `m.mentions` parsing yet, just "a message arrived in a room that isn't the one in view" (the common case that actually needs a nudge); suppressed for the user's own echoed messages and the currently-selected room
+- [x] Phase 1: Matrix text rooms (shipped); Phase 2: E2EE, attachments/reactions — explicitly not built, a real separate undertaking (device verification, key backup, cross-signing), not an incremental add
+- [x] Design note: kept UI DOS/Win9x-adjacent (status bar, room list | messages)
 
 ## Remote attach
 
