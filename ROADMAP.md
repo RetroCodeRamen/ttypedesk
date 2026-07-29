@@ -143,6 +143,7 @@ See [docs/gui-bridge.md](docs/gui-bridge.md).
 - [x] **DisplayNest** — Xvfb nest for arbitrary GUI apps (X11 only, no Wayland yet)
 - [ ] **RemoteNest** — RDP/VNC decode into the same path
 - [x] App/desktop manifests can launch bridge targets — `bridge:<cmd>` LaunchAction, Add Program's Command field works same as any other launch string
+- [x] **Text legibility (AT-SPI overlay)** — real characters instead of raster noise for text-heavy apps, via the Linux accessibility tree (`internal/bridge/atspi.go`). Works well for native GTK/Qt apps (validated against `zenity`/`gtk3-demo`); does **not** work for Electron apps (validated against Cursor — matches a known open VS Code accessibility issue). Non-fatal/optional: no `dbus`/`at-spi2-core` on the host just means raster-only, same as before this existed.
 - [ ] Perf: overscan buffer, adaptive frame budget over SSH (currently a flat 10fps), XRandR live resize instead of fixed-resolution-plus-rescale
 
 ## Terminal

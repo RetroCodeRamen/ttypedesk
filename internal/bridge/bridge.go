@@ -7,7 +7,9 @@ package bridge
 
 import (
 	"fmt"
+	"math"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +35,20 @@ const (
 	xvfbCellH = 18 // 2 half-block rows per cell row, so /2 = 9px per half
 )
 
+// atspiTickEvery is how many raster capture ticks pass between AT-SPI text
+// re-walks — text layout changes far less often than pixels, and each walk
+// costs a handful of D-Bus round-trips per node, so re-walking at the full
+// captureFPS would be wasteful. At captureFPS=10 this is a ~3.3fps text
+// refresh, plenty for anything that isn't scrolling text mid-keystroke.
+const atspiTickEvery = 3
+
+// atspiMaxDepth/atspiMaxNodes bound one walkText call so a pathologically
+// large accessible tree can't stall the capture loop.
+const (
+	atspiMaxDepth = 40
+	atspiMaxNodes = 2000
+)
+
 // BridgeSurface hosts one bridged GUI app. Implements surface.Surface.
 type BridgeSurface struct {
 	id      string
@@ -48,16 +64,26 @@ type BridgeSurface struct {
 	capW    int
 	capH    int
 
-	mu     sync.Mutex
-	cols   int
-	rows   int
-	cells  []cell.Cell
-	dirty  bool
-	title  string
-	closed bool
+	// AT-SPI text overlay — optional/best-effort. a11y is nil (raster-only,
+	// no error) whenever dbus-daemon/at-spi2-registryd aren't available or
+	// setup otherwise fails; see docs/gui-bridge.md for which apps this
+	// actually helps (native GTK/Qt) versus doesn't (Electron apps don't
+	// expose real text over AT-SPI — confirmed empirically, not assumed).
+	busCmd       *exec.Cmd
+	registrydCmd *exec.Cmd
+	a11y         *atspiClient
+
+	mu        sync.Mutex
+	cols      int
+	rows      int
+	cells     []cell.Cell
+	textNodes []textNode // latest AT-SPI walk result; nil if a11y is nil
+	dirty     bool
+	title     string
+	closed    bool
 
 	stop chan struct{}
-	done chan struct{}
+	wg   sync.WaitGroup
 }
 
 // New spawns Xvfb, launches command against it, and starts capturing.
@@ -94,40 +120,59 @@ func New(id, command string, cols, rows int) (*BridgeSurface, error) {
 		return nil, err
 	}
 
-	guestCmd, err := startGuest(display, command)
+	// AT-SPI text overlay setup — best-effort. Must happen before the guest
+	// launches so Chromium/Electron-style toolkits that only build a tree
+	// when an AT client is already listening have a chance to see one
+	// (doesn't help Cursor specifically, see docs/gui-bridge.md, but costs
+	// nothing to still try for whatever guest command is actually passed).
+	busCmd, registrydCmd, a11y, busAddr := setupATSPI(id)
+
+	guestCmd, err := startGuest(display, command, busAddr)
 	if err != nil {
+		if a11y != nil {
+			a11y.close()
+		}
+		killWait(registrydCmd)
+		killWait(busCmd)
 		conn.Close()
 		killWait(xvfbCmd)
 		return nil, err
 	}
 
 	b := &BridgeSurface{
-		id:      id,
-		command: command,
-		display: display,
-		conn:    conn,
-		root:    screen.Root,
-		byteOrd: setup.ImageByteOrder,
-		inj:     inj,
-		capW:    capW,
-		capH:    capH,
-		cols:    cols,
-		rows:    rows,
-		cells:   make([]cell.Cell, cols*rows),
-		dirty:   true,
-		title:   command,
-		stop:    make(chan struct{}),
-		done:    make(chan struct{}),
-		xvfbCmd: xvfbCmd,
-		guest:   guestCmd,
+		id:           id,
+		command:      command,
+		display:      display,
+		conn:         conn,
+		root:         screen.Root,
+		byteOrd:      setup.ImageByteOrder,
+		inj:          inj,
+		capW:         capW,
+		capH:         capH,
+		busCmd:       busCmd,
+		registrydCmd: registrydCmd,
+		a11y:         a11y,
+		cols:         cols,
+		rows:         rows,
+		cells:        make([]cell.Cell, cols*rows),
+		dirty:        true,
+		title:        command,
+		stop:         make(chan struct{}),
+		xvfbCmd:      xvfbCmd,
+		guest:        guestCmd,
 	}
+	b.wg.Add(1)
 	go b.captureLoop()
-	slog.Info("bridge surface started id=%s display=:%d cmd=%q", id, display, command)
+	if a11y != nil {
+		b.wg.Add(1)
+		go b.atspiLoop()
+	}
+	slog.Info("bridge surface started id=%s display=:%d cmd=%q a11y=%v", id, display, command, a11y != nil)
 	return b, nil
 }
 
 func (b *BridgeSurface) captureLoop() {
-	defer close(b.done)
+	defer b.wg.Done()
 	ticker := time.NewTicker(time.Second / captureFPS)
 	defer ticker.Stop()
 	for {
@@ -136,16 +181,44 @@ func (b *BridgeSurface) captureLoop() {
 			return
 		case <-ticker.C:
 			b.mu.Lock()
-			w, h := b.capW, b.capH
+			w, h, cols, rows := b.capW, b.capH, b.cols, b.rows
 			b.mu.Unlock()
 			img, err := captureFrame(b.conn, b.root, w, h, b.byteOrd)
 			if err != nil {
 				slog.Warn("bridge id=%s capture: %v", b.id, err)
 				continue
 			}
+			cells := gfx.EncodeHalfBlockFit(img, cols, rows, "stretch", 0, 0)
 			b.mu.Lock()
-			cells := gfx.EncodeHalfBlockFit(img, b.cols, b.rows, "stretch", 0, 0)
+			// Composite whatever text AT-SPI last found on top of the fresh
+			// raster — atspiLoop refreshes b.textNodes on its own, slower
+			// cadence, independently, so this never blocks on a D-Bus walk.
+			if len(b.textNodes) > 0 {
+				compositeText(cells, cols, rows, b.textNodes, w, h)
+			}
 			b.cells = cells
+			b.dirty = true
+			b.mu.Unlock()
+		}
+	}
+}
+
+// atspiLoop periodically re-walks the guest's accessible tree and stashes
+// the result for captureLoop to composite — on its own goroutine/ticker so
+// a slow walk (D-Bus round-trip per node) never stalls raster capture.
+func (b *BridgeSurface) atspiLoop() {
+	defer b.wg.Done()
+	period := (time.Second / captureFPS) * atspiTickEvery
+	ticker := time.NewTicker(period)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-b.stop:
+			return
+		case <-ticker.C:
+			nodes := b.a11y.walkText(atspiMaxDepth, atspiMaxNodes)
+			b.mu.Lock()
+			b.textNodes = nodes
 			b.dirty = true
 			b.mu.Unlock()
 		}
@@ -243,6 +316,60 @@ func cellToPixel(col, row, cols, rows, capW, capH int) (int16, int16) {
 	return int16(x), int16(y)
 }
 
+// compositeText overwrites cells covered by each text node's bounding box
+// with real characters, in place — the inverse of cellToPixel's math,
+// mapping a pixel rect back to a cell rect. Half-block cells all use the
+// same glyph, so this is the only place actual runes other than '▄' ever
+// appear in a bridge window; it keeps the raster background color (so the
+// overlay doesn't fight the app's own theme) and picks a contrasting
+// foreground by luminance.
+func compositeText(cells []cell.Cell, cols, rows int, nodes []textNode, capW, capH int) {
+	if cols < 1 || rows < 1 || capW < 1 || capH < 1 {
+		return
+	}
+	for _, n := range nodes {
+		x0 := clampInt(int(float64(n.X)/float64(capW)*float64(cols)), 0, cols)
+		y0 := clampInt(int(float64(n.Y)/float64(capH)*float64(rows)), 0, rows)
+		x1 := clampInt(int(math.Ceil(float64(int(n.X)+int(n.W))/float64(capW)*float64(cols))), 0, cols)
+		y1 := clampInt(int(math.Ceil(float64(int(n.Y)+int(n.H))/float64(capH)*float64(rows))), 0, rows)
+		if x1 <= x0 || y1 <= y0 {
+			continue
+		}
+		runes := []rune(strings.Join(strings.Fields(n.Text), " "))
+		i := 0
+		for row := y0; row < y1 && i < len(runes); row++ {
+			for col := x0; col < x1 && i < len(runes); col++ {
+				idx := row*cols + col
+				if idx >= 0 && idx < len(cells) {
+					bg := cells[idx].BG
+					cells[idx] = cell.Cell{Rune: runes[i], FG: contrastColor(bg), BG: bg}
+				}
+				i++
+			}
+		}
+	}
+}
+
+// contrastColor picks black or white by background luminance, so overlaid
+// text stays legible regardless of the guest app's own color scheme.
+func contrastColor(bg cell.Color) cell.Color {
+	lum := 0.299*float64(bg.R) + 0.587*float64(bg.G) + 0.114*float64(bg.B)
+	if lum > 128 {
+		return cell.RGB(0, 0, 0)
+	}
+	return cell.RGB(0xFF, 0xFF, 0xFF)
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
+
 func xtestButton(b int) byte {
 	if b < 1 {
 		return 1
@@ -278,7 +405,7 @@ func (b *BridgeSurface) Close() error {
 	b.mu.Unlock()
 
 	close(b.stop)
-	<-b.done
+	b.wg.Wait()
 
 	if b.inj != nil {
 		b.inj.close()
@@ -288,6 +415,11 @@ func (b *BridgeSurface) Close() error {
 		b.conn.Close()
 	}
 	killWait(b.xvfbCmd)
+	if b.a11y != nil {
+		b.a11y.close()
+	}
+	killWait(b.registrydCmd)
+	killWait(b.busCmd)
 	slog.Info("bridge surface closed id=%s", b.id)
 	return nil
 }

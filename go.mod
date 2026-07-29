@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/creack/pty v1.1.24
 	github.com/gdamore/tcell/v2 v2.13.10
+	github.com/godbus/dbus/v5 v5.2.2
 	github.com/jezek/xgb v1.3.1
 	github.com/mattn/go-runewidth v0.0.24
 	golang.org/x/sys v0.38.0

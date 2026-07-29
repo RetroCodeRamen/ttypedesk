@@ -2,7 +2,9 @@ package bridge
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +22,20 @@ func requireX11(t *testing.T, guestCmd string) {
 	}
 	if _, err := exec.LookPath(guestCmd); err != nil {
 		t.Skipf("%s not on PATH, skipping (apt install x11-apps to run this locally)", guestCmd)
+	}
+}
+
+// requireATSPI additionally skips unless dbus-daemon and at-spi2-registryd
+// are available — the text-overlay tests need the full accessibility stack
+// on top of requireX11's plain Xvfb/guest-app requirement.
+func requireATSPI(t *testing.T, guestCmd string) {
+	t.Helper()
+	requireX11(t, guestCmd)
+	if _, err := exec.LookPath("dbus-daemon"); err != nil {
+		t.Skip("dbus-daemon not on PATH, skipping (apt install dbus-x11 to run this locally)")
+	}
+	if findRegistryd() == "" {
+		t.Skip("at-spi2-registryd not found, skipping (apt install at-spi2-core to run this locally)")
 	}
 }
 
@@ -163,4 +179,41 @@ func TestNewFailsClearlyWithoutXvfb(t *testing.T) {
 	if _, err := New("t6", "true", 10, 5); err == nil {
 		t.Fatal("New() should fail when Xvfb isn't available")
 	}
+}
+
+// TestBridgeSurfaceTextOverlayOnNativeGTKApp is the end-to-end proof of the
+// AT-SPI text overlay (see docs/gui-bridge.md — validated to work for
+// native GTK/Qt apps, not Electron ones): a real GTK app's actual text
+// content should show up as real characters in Snapshot(), not just the
+// constant half-block glyph every raster-only cell uses.
+func TestBridgeSurfaceTextOverlayOnNativeGTKApp(t *testing.T) {
+	requireATSPI(t, "zenity")
+
+	const needle = "OVERLAYCHECK"
+	dir := t.TempDir()
+	path := dir + "/sample.txt"
+	if err := os.WriteFile(path, []byte(needle+" some readable text for the overlay test\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	b, err := New("t7", "zenity --text-info --filename="+path+" --width=400 --height=200", 60, 25)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	defer b.Close()
+
+	deadline := time.Now().Add(15 * time.Second)
+	for time.Now().Before(deadline) {
+		time.Sleep(300 * time.Millisecond)
+		var sb strings.Builder
+		for _, c := range b.Snapshot() {
+			if c.Rune != 0 {
+				sb.WriteRune(c.Rune)
+			}
+		}
+		if strings.Contains(sb.String(), needle) {
+			return // found real overlaid text — overlay works end to end
+		}
+	}
+	t.Fatalf("never found %q as real overlaid text within 15s — text overlay isn't reaching the cell grid", needle)
 }

@@ -77,10 +77,16 @@ func connectRetry(display, attempts int, delay time.Duration) (*xgb.Conn, error)
 	return nil, lastErr
 }
 
-// startGuest launches the bridged GUI command against display.
-func startGuest(display int, command string) (*exec.Cmd, error) {
+// startGuest launches the bridged GUI command against display. busAddr, if
+// non-empty, is exported as DBUS_SESSION_BUS_ADDRESS so an AT-SPI-aware
+// guest can register its accessible tree with our private bus.
+func startGuest(display int, command, busAddr string) (*exec.Cmd, error) {
 	cmd := exec.Command("sh", "-c", command)
-	cmd.Env = append(os.Environ(), fmt.Sprintf("DISPLAY=:%d", display))
+	env := append(os.Environ(), fmt.Sprintf("DISPLAY=:%d", display))
+	if busAddr != "" {
+		env = append(env, "DBUS_SESSION_BUS_ADDRESS="+busAddr)
+	}
+	cmd.Env = env
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start guest %q: %w", command, err)
 	}
