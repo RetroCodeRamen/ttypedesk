@@ -207,8 +207,21 @@ a day agenda; create and edit local events directly (no account needed for
 this part). Reminders don't have their own bespoke toast UI — they post
 into the same desktop-wide [notification service](#notifications)
 everything else uses, so a Calendar reminder looks and behaves exactly like
-any other notification. (Google/Microsoft account sync is on the roadmap,
-not shipped yet — see `ROADMAP.md`.)
+any other notification.
+
+**Google Calendar / Microsoft Graph sync** is opt-in, read-only (fetch and
+merge, not two-way), and per-provider from Settings → Calendar: paste in
+the Client ID from your own OAuth app (Google Cloud Console / Azure
+Portal — there's no ttypedesk-wide client ID, see `docs/calendar.md` for
+why) and connect through a real browser consent flow. A local loopback
+HTTP server catches the redirect; the consent URL is also shown directly
+in Settings, since plenty of this project's users have no local browser
+at all over SSH. Sync runs when Calendar opens and on demand (**S** key)
+— not a standing background service, so a synced event's reminder is only
+as fresh as the last time Calendar was opened. Tokens live under
+`~/.config/ttypedesk/credentials/` (never in `config.json`, never in git);
+a refreshed access token is saved back automatically, so reconnecting is
+never required just because a short-lived token expired.
 
 ## App Store
 

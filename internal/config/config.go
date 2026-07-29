@@ -141,6 +141,26 @@ type Config struct {
 	Palette             PaletteCfg        `json:"palette"`
 	Recipes             []Recipe          `json:"recipes"`
 	AppSources          []AppSource       `json:"app_sources"`
+	Calendar            CalendarCfg       `json:"calendar"`
+}
+
+// CalendarAccount is one opt-in OAuth2 calendar connection. ClientID is
+// the user's own OAuth app (Google Cloud Console / Azure Portal) — there
+// is no ttypedesk-wide client ID, see internal/calsync's package doc.
+// Nothing here is a secret; the token itself lives in
+// internal/credstore, never in this file.
+type CalendarAccount struct {
+	Provider string `json:"provider"` // "google" | "microsoft"
+	Enabled  bool   `json:"enabled"`
+	ClientID string `json:"client_id"`
+}
+
+// CalendarCfg is Settings → Calendar: accounts, reminder lead time, and
+// an optional timezone override (empty = local system timezone).
+type CalendarCfg struct {
+	Accounts []CalendarAccount `json:"accounts"`
+	LeadMin  int               `json:"lead_min"`
+	Timezone string            `json:"timezone"`
 }
 
 // TaskbarDock returns normalized dock side.
@@ -212,6 +232,7 @@ func Default() Config {
 		AppSources: []AppSource{
 			{Repo: "RetroCodeRamen/ttypedesk-apps", Branch: "main", Trusted: true},
 		},
+		Calendar: CalendarCfg{LeadMin: 5},
 	}
 }
 

@@ -357,7 +357,8 @@ func (c *Client) pollCalendarReminders() {
 		return
 	}
 	c.lastRemindPoll = now
-	for _, due := range calendar.DueReminders(now, 5*time.Minute, c.reminded) {
+	lead := time.Duration(c.cfg.Calendar.LeadMin) * time.Minute
+	for _, due := range calendar.DueReminders(now, lead, c.reminded) {
 		body := due.Event.Start.Format("15:04")
 		if due.Event.AllDay {
 			body = "All day — " + due.Event.Start.Format("Mon Jan 2")

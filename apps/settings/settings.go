@@ -18,12 +18,18 @@ type App struct {
 	onNotify func(title, body string)
 	onClearN func()
 	ctx      *uiapp.Context
-	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about
+	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about, 10 calendar
 	sel      int
 	editing  bool
 	editBuf  string
 	status   string
 	hkEdit   string // action id while editing a hotkey
+
+	// Calendar page (calendar_page.go) state.
+	calEditProvider string // "google" | "microsoft" while editing a Client ID
+	calConnecting   string // provider with a connect flow in flight, if any
+	calAuthURL      string // consent URL for calConnecting, once known
+	calResults      chan calMsg
 }
 
 func New(cfg config.Config, onSave func(config.Config), onNotify func(title, body string), onClearNotices ...func()) *App {
@@ -116,7 +122,7 @@ func (a *App) key(e uiapp.Event) error {
 func (a *App) activate() {
 	switch a.page {
 	case 0:
-		items := 9
+		items := 10
 		if a.sel >= items {
 			a.sel = items - 1
 		}
@@ -139,6 +145,8 @@ func (a *App) activate() {
 			a.page, a.sel = 8, 0
 		case 8:
 			a.page, a.sel = 9, 0
+		case 9:
+			a.page, a.sel = 10, 0
 		}
 	case 1: // appearance
 		switch a.sel {
@@ -439,10 +447,17 @@ func (a *App) activate() {
 		case 4:
 			a.status = fmt.Sprintf("Effective FPS: %d", a.cfg.EffectiveFPS())
 		}
+	case 10: // calendar
+		a.calendarActivate()
 	}
 }
 
 func (a *App) commitEdit() {
+	if a.page == 10 {
+		a.calendarCommitEdit()
+		a.persist()
+		return
+	}
 	defer a.persist()
 	switch a.page {
 	case 1:
@@ -556,6 +571,7 @@ func (a *App) persist() {
 }
 
 func (a *App) Draw(cv *uiapp.Canvas) error {
+	a.drainCalResults()
 	cols, rows := cv.Bounds()
 	bg := cell.RGB(0xC0, 0xC0, 0xC0)
 	fg := cell.RGB(0x00, 0x00, 0x00)
@@ -613,6 +629,7 @@ func (a *App) lines() []string {
 			"Input (hotkeys)",
 			"Advanced",
 			"About",
+			"Calendar",
 		}
 	case 1:
 		path := a.cfg.Wallpaper.Path
@@ -744,6 +761,8 @@ func (a *App) lines() []string {
 			"Notifications: ~/.config/ttypedesk/notifications.json",
 			fmt.Sprintf("Effective FPS: %d  (SSH: %s)", a.cfg.EffectiveFPS(), ssh),
 		}
+	case 10:
+		return a.calendarLines()
 	default:
 		ssh := "no"
 		if config.OverSSH() {

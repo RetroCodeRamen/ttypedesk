@@ -50,9 +50,9 @@ Big feature — plan before coding deep. Design: [docs/calendar.md](docs/calenda
 - [x] Click taskbar clock opens Calendar app / month popover
 - [x] Month view + day agenda; create/edit **local** events
 - [x] Reminders → **system notifications** (not a calendar-only toast UI)
-- [ ] Google Calendar sync (OAuth2, opt-in)
-- [ ] Microsoft Graph calendar sync (OAuth2, opt-in)
-- [ ] Settings → Calendar (accounts, lead time, timezone)
+- [x] Google Calendar sync (OAuth2 PKCE loopback flow, opt-in, read-only — see [docs/calendar.md](docs/calendar.md))
+- [x] Microsoft Graph calendar sync (OAuth2 PKCE loopback flow, opt-in, read-only)
+- [x] Settings → Calendar (Google/Microsoft connect+disconnect, reminder lead time, timezone)
 
 ## Window manager
 

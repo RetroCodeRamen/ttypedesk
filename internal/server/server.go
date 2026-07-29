@@ -592,7 +592,7 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 			surf, err = surface.NewAppSurface(id, "Clock", clock.New(), cc, cr)
 			title = "Clock"
 		case "calendar":
-			surf, err = surface.NewAppSurface(id, "Calendar", calendar.New(), cc, cr)
+			surf, err = surface.NewAppSurface(id, "Calendar", calendar.New(s.cfg), cc, cr)
 			title = "Calendar"
 		case "notes":
 			surf, err = surface.NewAppSurface(id, "Notes", notes.New(), cc, cr)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ttypedesk/ttypedesk/internal/config"
 	"github.com/ttypedesk/ttypedesk/pkg/cell"
 	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
 )
@@ -33,21 +34,35 @@ type App struct {
 	status  string
 	cursor  int // agenda selection
 	dirty   bool
+
+	cfg config.Config
+	ctx *uiapp.Context
+
+	syncing      bool
+	pendingSyncs int
+	syncResults  chan syncResult
 }
 
-func New() *App {
+// New builds a Calendar bound to cfg — specifically cfg.Calendar.Accounts,
+// to know what (if anything) to sync. Account setup itself (connect flow,
+// enable/disable, lead time, timezone) lives in Settings → Calendar, not
+// here; Calendar only ever reads config, it never writes it.
+func New(cfg config.Config) *App {
 	now := time.Now()
 	day := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	return &App{
 		view: time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()),
 		sel:  day,
+		cfg:  cfg,
 	}
 }
 
 func storePath() string { return StorePath() }
 
 func (a *App) Init(ctx *uiapp.Context) error {
+	a.ctx = ctx
 	a.load()
+	a.syncAll()
 	return nil
 }
 
@@ -206,6 +221,9 @@ func (a *App) key(e uiapp.Event) error {
 		a.editBuf = ""
 		a.status = "New event title — Enter to save"
 	}
+	if e.Rune == 's' || e.Rune == 'S' {
+		a.syncAll()
+	}
 	if e.Rune == '[' {
 		a.view = a.view.AddDate(0, -1, 0)
 		a.sel = clampDay(a.view, a.sel.Day())
@@ -267,6 +285,7 @@ func sameDay(a, b time.Time) bool {
 }
 
 func (a *App) Draw(cv *uiapp.Canvas) error {
+	a.drainSyncResults()
 	cols, rows := cv.Bounds()
 	bg := cell.RGB(0xC0, 0xC0, 0xC0)
 	fg := cell.RGB(0x00, 0x00, 0x00)
@@ -277,7 +296,11 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 
 	title := fmt.Sprintf(" %s ", a.view.Format("January 2006"))
 	cv.DrawText(0, 0, title, cell.RGB(0xFF, 0xFF, 0xFF), hdr, cell.AttrBold)
-	cv.DrawText(len(title)+1, 0, "[ ] months  arrows day  Enter=add  Del=remove", fg, bg, 0)
+	hint := "[ ] months  arrows day  Enter=add  Del=remove"
+	if a.hasEnabledAccount() {
+		hint += "  S=sync"
+	}
+	cv.DrawText(len(title)+1, 0, hint, fg, bg, 0)
 
 	// weekday headers
 	days := []string{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}
@@ -334,6 +357,9 @@ func (a *App) Draw(cv *uiapp.Canvas) error {
 	}
 
 	help := "Local calendar — events in ~/.config/ttypedesk/calendar/"
+	if a.syncing {
+		help = "Syncing…"
+	}
 	if a.status != "" {
 		help = a.status
 	}

@@ -9,6 +9,7 @@ require (
 	github.com/godbus/dbus/v5 v5.2.2
 	github.com/jezek/xgb v1.3.1
 	github.com/mattn/go-runewidth v0.0.24
+	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.38.0
 	golang.org/x/term v0.37.0
 )
