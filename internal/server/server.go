@@ -328,6 +328,14 @@ func (s *Server) launchAction(action string) error {
 			_, err := s.CreateBridge(cmd, cmd)
 			return err
 		}
+		if len(action) > 7 && action[:7] == "extapp:" {
+			parts := strings.Fields(action[7:])
+			if len(parts) == 0 {
+				return fmt.Errorf("empty extapp command")
+			}
+			_, err := s.CreateExtApp(parts[0], parts[0], parts[1:])
+			return err
+		}
 		_, err := s.CreateApp(action, action)
 		return err
 	}
@@ -551,6 +559,32 @@ func (s *Server) CreateBridge(title, command string) (*Window, error) {
 	return win, nil
 }
 
+// CreateExtApp spawns command (with args) as an out-of-process App SDK
+// window (see internal/surface.ExtAppSurface, docs/extapp.md) — any
+// executable speaking the NDJSON protocol over its own stdin/stdout,
+// rather than a Go uiapp.App linked into this binary.
+func (s *Server) CreateExtApp(title, command string, args []string) (*Window, error) {
+	s.mu.Lock()
+	win, err := s.createLocked("extapp", title, "", "", command, args, false)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	launch := "extapp:" + command
+	if len(args) > 0 {
+		launch += " " + strings.Join(args, " ")
+	}
+	win.Launch = launch
+	s.mu.Unlock()
+	if err := s.bindNativeApp(win); err != nil {
+		slog.Error("BindHost failed id=%s: %v", win.ID, err)
+		s.CloseWindow(win.ID)
+		return nil, err
+	}
+	return win, nil
+}
+
 func (s *Server) create(kind, title, appName, path string) (*Window, error) {
 	s.mu.Lock()
 	win, err := s.createLocked(kind, title, appName, path, "", nil, false)
@@ -736,6 +770,15 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 		if title == "" {
 			title = command
 		}
+	case "extapp":
+		if command == "" {
+			return nil, fmt.Errorf("extapp: empty command")
+		}
+		surf, err = surface.NewExtApp(id, command, args, cc, cr)
+		if title == "" {
+			title = command
+		}
+		kind = "app"
 	default:
 		return nil, fmt.Errorf("unknown kind %q", kind)
 	}
@@ -764,27 +807,29 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 	return win, nil
 }
 
-// bindNativeApp initializes AppSurface hosts outside Server.mu.
+// bindNativeApp initializes AppSurface/ExtAppSurface hosts outside Server.mu.
 func (s *Server) bindNativeApp(win *Window) error {
 	if win == nil {
 		return nil
 	}
-	as, ok := win.Surface.(*surface.AppSurface)
-	if !ok {
-		return nil
-	}
 	hid := win.ID
-	return as.BindHost(&appHost{srv: s, id: hid}, func(t string) {
-		s.mu.Lock()
-		if w := s.windows[hid]; w != nil {
-			if !w.TitlePinned {
-				w.Title = t
+	switch surf := win.Surface.(type) {
+	case *surface.AppSurface:
+		return surf.BindHost(&appHost{srv: s, id: hid}, func(t string) {
+			s.mu.Lock()
+			if w := s.windows[hid]; w != nil {
+				if !w.TitlePinned {
+					w.Title = t
+				}
 			}
-		}
-		s.mu.Unlock()
-	}, func() {
-		go s.CloseWindow(hid)
-	})
+			s.mu.Unlock()
+		}, func() {
+			go s.CloseWindow(hid)
+		})
+	case *surface.ExtAppSurface:
+		return surf.BindHost(&appHost{srv: s, id: hid})
+	}
+	return nil
 }
 
 // SetWindowTitle updates a window's title bar text.

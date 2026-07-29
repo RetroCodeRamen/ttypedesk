@@ -34,6 +34,46 @@ func TestMouseEventRoundTrip(t *testing.T) {
 	}
 }
 
+func TestInitPayloadRoundTrip(t *testing.T) {
+	want := InitPayload{WindowID: "w1", Cols: 80, Rows: 24}
+	got := roundTrip(t, TypeInit, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("InitPayload round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestReadyPayloadRoundTrip(t *testing.T) {
+	want := ReadyPayload{Err: "boom"}
+	got := roundTrip(t, TypeReady, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("ReadyPayload round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestNotifyPayloadRoundTrip(t *testing.T) {
+	want := NotifyPayload{Title: "Hi", Body: "there", Icon: "🔔"}
+	got := roundTrip(t, TypeNotify, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("NotifyPayload round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestLaunchPayloadRoundTrip(t *testing.T) {
+	want := LaunchPayload{Action: "terminal"}
+	got := roundTrip(t, TypeLaunch, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("LaunchPayload round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
+func TestOpenPathPayloadRoundTrip(t *testing.T) {
+	want := OpenPathPayload{Path: "/tmp/foo.txt"}
+	got := roundTrip(t, TypeOpenPath, want)
+	if !reflect.DeepEqual(want, got) {
+		t.Fatalf("OpenPathPayload round-trip mismatch: want %+v, got %+v", want, got)
+	}
+}
+
 func TestSnapshotWindowRoundTrip(t *testing.T) {
 	want := Snapshot{
 		Cols: 80,

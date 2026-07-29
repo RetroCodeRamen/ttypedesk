@@ -169,11 +169,11 @@ Start ▸ App Store — install extra apps from configured GitHub catalogs (fetc
 
 ## Apps & platform
 
-- [ ] Out-of-process App SDK (stdio / Unix socket NDJSON)
+- [x] Out-of-process App SDK — NDJSON over stdio (`internal/surface.ExtAppSurface`), not a Unix socket: simpler than managing a socket path/lifecycle per app, and stdin/stdout are already there for free on any spawned process. Covers the same lifecycle `uiapp.App` has (init → key/mouse/resize/focus → draw → close) plus `Host` RPCs (`notify`, `launch`, `open_path`, `title_changed`, `close_window`) — full spec: [docs/extapp.md](docs/extapp.md), reference implementation: [`cmd/extapp-hello`](cmd/extapp-hello/main.go). Launch with `extapp:/path/to/binary [args]`, same convention as `pty:`/`bridge:`. Scoped down from the original sketch: v1 requires every `screen_diff` to be a full-grid redraw (no partial-rect diffing yet), and `SaveCredential`/`LoadCredential`/`PickFile`/`PlayAudio` have no wire message yet — nothing out-of-process has needed them so far; add the message type when one does.
 - [x] **Comprehensive Host / App API** — `uiapp.Host` gained `PlayAudio` (`internal/audio`, wraps `oto/v3`, fixed 48kHz/stereo output — no per-call resampling), `uiapp.NewMediaClock()` (play/pause/position, no Host needed — pure local timing), `PickFile` (`apps/filepicker`, a small modal browser, not a second Files app), and `SaveCredential`/`LoadCredential` (`internal/credstore`, one file per key under `~/.config/ttypedesk/credentials/`, 0600). "Background workers" needs no dedicated API — apps just spawn goroutines directly, same as any other Go code; prerequisite for media & chat apps below is now in place
 - [x] Session save/restore (open windows + geometry)
-- [ ] More sample native apps as needed (beyond Clock / Notes / Settings / Files)
-- [ ] Proto `notify` message for out-of-process apps (hooks system notification service)
+- [ ] More sample native apps as needed (beyond Clock / Notes / Settings / Files) — left open on purpose: nothing built while closing out this roadmap actually revealed a concrete gap worth filling, and this item was explicitly scoped as "pick once something reveals what's missing," not "build something arbitrary to check the box."
+- [x] Proto `notify` message for out-of-process apps (hooks system notification service) — `TypeNotify`/`NotifyPayload` in `internal/proto`, forwarded straight to the same `internal/notify` service in-process apps use
 
 ## First-party media apps
 
@@ -188,7 +188,7 @@ Native `uiapp` music player with **classic Winamp energy** (not a flat “Spotif
 - [x] Visualizer bars from PCM (windowed peak amplitude across 16 bars, half-block-rendered — not a real FFT spectrum; see `apps/amp/decode.go`)
 - [x] Layout: single window, playlist + transport + visualizer together — not separate floating skin/EQ panes, which felt like unearned complexity for a v1 with no actual EQ processing to show
 - [x] Formats via host decode — ffmpeg subprocess (`-f s16le` raw PCM out), no linked decoder library; a soft runtime dependency, checked at launch with a clear error if missing
-- [ ] Wire to audio-stream companion when over SSH so sound plays on the laptop — depends on the Audio streaming section below, not yet built
+- [x] Wire to audio-stream companion when over SSH so sound plays on the laptop — automatic, not separate wiring: the Audio streaming section below captures the default sink's monitor desktop-wide, so Amp's own playback (already audible on the host) is already in the stream when Settings → Audio streaming is on
 
 ### ASCII video player
 

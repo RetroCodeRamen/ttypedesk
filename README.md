@@ -219,6 +219,10 @@ Once major hits `1`, two surfaces stop moving casually:
 Everything else — internal packages, the App Store catalog format, CLI
 flags — can still change; those aren't the stability contract.
 
+## Writing an app
+
+Two ways in: a native `uiapp.App` linked into this Go binary (`apps/clock` is the smallest example), or any executable in any language speaking a small NDJSON protocol over its own stdin/stdout — the desktop spawns it and treats the window like a native one (taskbar, focus, resize, crash isolation, the works). Spec + a runnable reference implementation: [docs/extapp.md](docs/extapp.md), [`cmd/extapp-hello`](cmd/extapp-hello/main.go). Launch either kind with `extapp:/path/to/binary`.
+
 ## Roadmap
 
 Upcoming work is tracked in [ROADMAP.md](ROADMAP.md) — a growing pile of ideas ranging from "reasonable" to "an ASCII video player," in no particular order of restraint. SSH streaming notes: [docs/ssh.md](docs/ssh.md).
@@ -227,14 +231,15 @@ Upcoming work is tracked in [ROADMAP.md](ROADMAP.md) — a growing pile of ideas
 
 ```
 cmd/ttypedesk/     entrypoint
+cmd/extapp-hello/  out-of-process App SDK reference implementation
 internal/
   server/          window manager
   client/          tcell DOS desktop
   vterm/           libvterm cgo wrapper
   tty/             PTY spawn
-  surface/         pty / app / gfx surfaces
+  surface/         pty / app / gfx / bridge / extapp surfaces
   gfx/             RGBA → half-block cells
-  proto/           cell-diff messages
+  proto/           wire messages (attach framing + out-of-process App SDK)
   attach/          Unix socket attach
   config/
 pkg/

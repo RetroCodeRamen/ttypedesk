@@ -26,6 +26,18 @@ const (
 	TypeAttach       MessageType = "attach"
 	TypeDetach       MessageType = "detach"
 	TypeSnapshot     MessageType = "snapshot"
+
+	// The out-of-process App SDK (internal/extapp; see docs/extapp.md)
+	// reuses the types above for the lifecycle it shares with in-process
+	// uiapp.App (Key/Mouse/Resize/Focus host->app; ScreenDiff app->host
+	// for Draw; TitleChanged app->host for Host.SetTitle; CloseWindow
+	// app->host for Host.RequestClose) and adds these three for the parts
+	// that don't already have an equivalent:
+	TypeInit     MessageType = "init"      // host -> app: window id + initial size, once at startup
+	TypeReady    MessageType = "ready"     // app -> host: Init complete (Err set on failure)
+	TypeNotify   MessageType = "notify"    // app -> host: Host.Notify
+	TypeLaunch   MessageType = "launch"    // app -> host: Host.Launch
+	TypeOpenPath MessageType = "open_path" // app -> host: Host.OpenPath
 )
 
 // Envelope wraps every message.
@@ -78,6 +90,40 @@ type ScreenDiffPayload struct {
 
 type TitleChanged struct {
 	Title string `json:"title"`
+}
+
+// InitPayload is the out-of-process App SDK's one-time startup message
+// (see TypeInit): the window id an app needs for logging/reference, and
+// its initial canvas size (also delivered again via a normal TypeResize
+// on every later resize).
+type InitPayload struct {
+	WindowID string `json:"window_id"`
+	Cols     int    `json:"cols"`
+	Rows     int    `json:"rows"`
+}
+
+// ReadyPayload answers TypeInit. Err is empty on success; a non-empty Err
+// marks the window crashed with that message, same as an in-process app
+// panicking in Init.
+type ReadyPayload struct {
+	Err string `json:"err,omitempty"`
+}
+
+// NotifyPayload is TypeNotify's payload — see uiapp.Host.Notify.
+type NotifyPayload struct {
+	Title string `json:"title"`
+	Body  string `json:"body"`
+	Icon  string `json:"icon,omitempty"`
+}
+
+// LaunchPayload is TypeLaunch's payload — see uiapp.Host.Launch.
+type LaunchPayload struct {
+	Action string `json:"action"`
+}
+
+// OpenPathPayload is TypeOpenPath's payload — see uiapp.Host.OpenPath.
+type OpenPathPayload struct {
+	Path string `json:"path"`
 }
 
 type SnapshotWindow struct {
