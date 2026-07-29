@@ -18,7 +18,7 @@ type App struct {
 	onNotify func(title, body string)
 	onClearN func()
 	ctx      *uiapp.Context
-	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about, 10 calendar
+	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about, 10 calendar, 11 audio streaming
 	sel      int
 	editing  bool
 	editBuf  string
@@ -122,7 +122,7 @@ func (a *App) key(e uiapp.Event) error {
 func (a *App) activate() {
 	switch a.page {
 	case 0:
-		items := 10
+		items := 11
 		if a.sel >= items {
 			a.sel = items - 1
 		}
@@ -147,6 +147,8 @@ func (a *App) activate() {
 			a.page, a.sel = 9, 0
 		case 9:
 			a.page, a.sel = 10, 0
+		case 10:
+			a.page, a.sel = 11, 0
 		}
 	case 1: // appearance
 		switch a.sel {
@@ -449,6 +451,17 @@ func (a *App) activate() {
 		}
 	case 10: // calendar
 		a.calendarActivate()
+	case 11: // audio streaming
+		switch a.sel {
+		case 0:
+			a.cfg.AudioStream.Enabled = !a.cfg.AudioStream.Enabled
+			a.persist()
+			a.status = fmt.Sprintf("Stream audio to attached clients: %v", a.cfg.AudioStream.Enabled)
+		case 1:
+			a.cfg.AudioStream.Mute = !a.cfg.AudioStream.Mute
+			a.persist()
+			a.status = fmt.Sprintf("Audio streaming muted: %v", a.cfg.AudioStream.Mute)
+		}
 	}
 }
 
@@ -630,6 +643,7 @@ func (a *App) lines() []string {
 			"Advanced",
 			"About",
 			"Calendar",
+			"Audio streaming",
 		}
 	case 1:
 		path := a.cfg.Wallpaper.Path
@@ -763,6 +777,11 @@ func (a *App) lines() []string {
 		}
 	case 10:
 		return a.calendarLines()
+	case 11:
+		return []string{
+			fmt.Sprintf("Stream audio to attached remote clients: %s", on[a.cfg.AudioStream.Enabled]),
+			fmt.Sprintf("Mute streaming (host playback unaffected): %s", on[a.cfg.AudioStream.Mute]),
+		}
 	default:
 		ssh := "no"
 		if config.OverSSH() {

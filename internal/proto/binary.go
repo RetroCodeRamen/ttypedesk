@@ -15,10 +15,13 @@ import (
 // framing). Input (key/mouse/attach/detach) stays JSON — small, and
 // changing it wasn't the point; only the snapshot direction, which used
 // to re-encode every window's full cell grid as JSON on every tick
-// regardless of whether anything had changed, needed to go.
+// regardless of whether anything had changed, needed to go. FrameAudio
+// carries raw PCM captured on the host (see internal/audiocap) to an
+// attached client's speakers, opt-in and independent of the diff stream.
 const (
-	FrameJSON byte = 1
-	FrameDiff byte = 2
+	FrameJSON  byte = 1
+	FrameDiff  byte = 2
+	FrameAudio byte = 3
 )
 
 // maxFrameLen bounds a single frame so a corrupt/malicious length prefix
@@ -178,6 +181,27 @@ func DecodeDiffFrame(data []byte) (DiffFrame, error) {
 		return f, r.err
 	}
 	return f, nil
+}
+
+// EncodeAudioChunk serializes interleaved int16 PCM samples (as captured
+// by internal/audiocap, at its fixed SampleRate/Channels) into a FrameAudio
+// payload — raw little-endian bytes, no header, since the frame envelope
+// already carries type and length.
+func EncodeAudioChunk(samples []int16) []byte {
+	b := make([]byte, len(samples)*2)
+	for i, s := range samples {
+		binary.LittleEndian.PutUint16(b[i*2:], uint16(s))
+	}
+	return b
+}
+
+// DecodeAudioChunk reverses EncodeAudioChunk.
+func DecodeAudioChunk(data []byte) []int16 {
+	out := make([]int16, len(data)/2)
+	for i := range out {
+		out[i] = int16(binary.LittleEndian.Uint16(data[i*2:]))
+	}
+	return out
 }
 
 // --- small encode helpers ---

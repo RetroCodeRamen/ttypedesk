@@ -462,6 +462,14 @@ on each other's cache. Cheaper than resending every cell as JSON on every
 tick, which matters most over SSH — see `docs/ssh.md` for the
 streaming-over-SSH notes generally.
 
+Turn on **Settings → Audio streaming** and whatever's audible on the host
+(desktop sounds, Amp, Vid, a bridged app) plays on the attached client too
+— captured desktop-wide off the default sink's monitor and muxed onto the
+same socket as the rest of attach traffic, no second connection or port.
+Mute in Settings takes effect immediately without reattaching; Enabled
+takes effect on the next `-attach`. See `docs/audio-stream.md` for how it
+works.
+
 ## Config, versioning & the stability policy
 
 `~/.config/ttypedesk/config.json` holds everything: theme, taskbar dock,

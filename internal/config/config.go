@@ -142,6 +142,7 @@ type Config struct {
 	Recipes             []Recipe          `json:"recipes"`
 	AppSources          []AppSource       `json:"app_sources"`
 	Calendar            CalendarCfg       `json:"calendar"`
+	AudioStream         AudioStreamCfg    `json:"audio_stream"`
 }
 
 // CalendarAccount is one opt-in OAuth2 calendar connection. ClientID is
@@ -161,6 +162,18 @@ type CalendarCfg struct {
 	Accounts []CalendarAccount `json:"accounts"`
 	LeadMin  int               `json:"lead_min"`
 	Timezone string            `json:"timezone"`
+}
+
+// AudioStreamCfg is Settings → Audio streaming: stream the host's current
+// audio output (desktop sounds, Amp, Vid, a bridged app — whatever's
+// already playing) to an attached remote client (-attach) over the same
+// socket -listen already uses, instead of only being audible on the host.
+// No bitrate control: this ships raw PCM, not an encoded codec (see
+// docs/audio-stream.md's own phasing — Opus was explicitly "pick later"),
+// so there's nothing to trade off yet.
+type AudioStreamCfg struct {
+	Enabled bool `json:"enabled"`
+	Mute    bool `json:"mute"` // checked live per chunk — takes effect without reattaching
 }
 
 // TaskbarDock returns normalized dock side.

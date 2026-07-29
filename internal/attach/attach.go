@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/gdamore/tcell/v2"
+	"github.com/ttypedesk/ttypedesk/internal/audio"
+	"github.com/ttypedesk/ttypedesk/internal/audiocap"
 	"github.com/ttypedesk/ttypedesk/internal/proto"
 	"github.com/ttypedesk/ttypedesk/internal/server"
 	"github.com/ttypedesk/ttypedesk/internal/surface"
@@ -35,14 +38,39 @@ func Serve(srv *server.Server, path string) error {
 	}
 }
 
+// frameWriter serializes WriteFrame calls from the diff ticker and (when
+// audio streaming is on) the audio-forwarding goroutine — both write to
+// the same conn concurrently otherwise, and net.Conn.Write only promises
+// safe concurrent *use*, not that two goroutines' writes can't interleave
+// mid-buffer, which would desync the whole length-prefixed framing.
+type frameWriter struct {
+	mu   sync.Mutex
+	conn net.Conn
+}
+
+func (w *frameWriter) write(typ byte, payload []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return proto.WriteFrame(w.conn, typ, payload)
+}
+
 func handleConn(srv *server.Server, conn net.Conn) {
 	defer conn.Close()
+	fw := &frameWriter{conn: conn}
 	hello, _ := proto.Encode(proto.TypeAttach, "", map[string]any{"role": "snapshot"})
-	if err := proto.WriteFrame(conn, proto.FrameJSON, hello); err != nil {
+	if err := fw.write(proto.FrameJSON, hello); err != nil {
 		return
 	}
 
 	go readInput(srv, conn)
+
+	// Audio streaming is opt-in (Settings → Audio streaming) and decided
+	// once per connection at attach time — Mute, unlike Enabled, is
+	// checked live every chunk in streamAudio so it takes effect
+	// immediately without needing to reattach.
+	if srv.Config().AudioStream.Enabled {
+		go streamAudio(srv, fw)
+	}
 
 	// lastCells is this connection's own view of what it's already been
 	// sent, per window — never shared with another attached client or
@@ -55,7 +83,31 @@ func handleConn(srv *server.Server, conn net.Conn) {
 	for range ticker.C {
 		snap := srv.Snapshot()
 		frame := buildDiffFrame(snap, lastCells)
-		if err := proto.WriteFrame(conn, proto.FrameDiff, proto.EncodeDiffFrame(frame)); err != nil {
+		if err := fw.write(proto.FrameDiff, proto.EncodeDiffFrame(frame)); err != nil {
+			return
+		}
+	}
+}
+
+// streamAudio captures the host's current audio output and forwards it to
+// one attach connection as FrameAudio chunks, until capture fails or the
+// connection's diff loop returns (which closes conn, which fails fw.write
+// here too — no separate shutdown signal needed). Mute is re-checked on
+// every chunk via srv.Config() so toggling it in Settings mid-session
+// takes effect immediately: capture keeps running either way, chunks are
+// just dropped while muted rather than tearing down and restarting parec.
+func streamAudio(srv *server.Server, fw *frameWriter) {
+	events := make(chan audiocap.Event, 1)
+	stream, err := audiocap.Capture(events)
+	if err != nil {
+		return
+	}
+	defer stream.Stop()
+	for samples := range stream.PCM {
+		if srv.Config().AudioStream.Mute {
+			continue
+		}
+		if err := fw.write(proto.FrameAudio, proto.EncodeAudioChunk(samples)); err != nil {
 			return
 		}
 	}
@@ -258,6 +310,14 @@ func RunViewer(path string) error {
 
 	lastCells := make(map[string][]cell.Cell)
 	var mouseDown bool
+	var audioPCM chan []int16
+	var audioFailed bool
+	var audioPlayback *audio.Playback
+	defer func() {
+		if audioPlayback != nil {
+			audioPlayback.Stop()
+		}
+	}()
 	for {
 		select {
 		case ev := <-events:
@@ -305,14 +365,40 @@ func RunViewer(path string) error {
 			if !ok {
 				return fmt.Errorf("connection closed")
 			}
-			if fr.typ != proto.FrameDiff {
-				continue // FrameJSON here is just the initial "attach" hello
+			switch fr.typ {
+			case proto.FrameDiff:
+				df, err := proto.DecodeDiffFrame(fr.payload)
+				if err != nil {
+					continue
+				}
+				paintDiffFrame(screen, df, lastCells)
+			case proto.FrameAudio:
+				if audioFailed {
+					continue
+				}
+				if audioPCM == nil {
+					audioPCM = make(chan []int16, 8)
+					pb, err := audio.Play(audioPCM)
+					if err != nil {
+						audioFailed = true
+						audioPCM = nil
+						continue
+					}
+					audioPlayback = pb
+				}
+				samples := proto.DecodeAudioChunk(fr.payload)
+				// Non-blocking: this is a live stream, not a file decode —
+				// dropping samples under backpressure keeps the viewer
+				// loop (and diff-frame reads) responsive, unlike
+				// internal/audio's usual blocking-as-backpressure pattern
+				// which is only right when something local is feeding it.
+				select {
+				case audioPCM <- samples:
+				default:
+				}
 			}
-			df, err := proto.DecodeDiffFrame(fr.payload)
-			if err != nil {
-				continue
-			}
-			paintDiffFrame(screen, df, lastCells)
+			// FrameJSON here would just be a stray post-hello envelope —
+			// nothing to do with it.
 		}
 	}
 }

@@ -49,6 +49,7 @@ There's also a GUI–TUI Bridge that renders real, unmodified X11 apps as window
 - A truecolor-capable host terminal (`COLORTERM=truecolor` recommended — this is a 2026 desktop wearing 1998's clothes, it still wants the good colors)
 - **Optional:** `Xvfb` (+ whatever GUI apps you want to bridge in) if you want to use the [GUI–TUI App Bridge](docs/gui-bridge.md) — `bridge:firefox`, `bridge:gimp`, genuinely any X11 app, rendered as half-blocks in a window like everything else. Not needed for anything else in the desktop. Also optional: `dbus-daemon` + `at-spi2-registryd` (`at-spi2-core`), for legible real text instead of colored noise in bridged **native GTK/Qt** apps — doesn't help Electron-based apps (e.g. Cursor/VS Code), see the doc for why.
 - **Optional:** `ffmpeg` if you want to use **Amp** (music player) or **Vid** (video player), both in Start ▸ Programs — decoding always shells out to it rather than linking a decoder library. Not needed for anything else.
+- **Optional:** `parec` (from `pulseaudio-utils`, or already present via PipeWire's `pipewire-pulse` compat layer on most modern distros) if you want **Settings → Audio streaming** — playing host audio on an attached remote client. Not needed for local use.
 
 libvterm **0.3.3** is vendored under `third_party/libvterm-0.3.3` (no system package required — one less thing to go wrong on someone else's machine).
 
@@ -188,7 +189,7 @@ Panics and LaunchAction failures are written here — check this file when somet
 ./bin/ttypedesk -attach /tmp/ttypedesk.sock
 ```
 
-Keyboard and mouse (press/drag/release/wheel) forward to the host; window chrome — dragging, resizing, taskbar, Start menu — is still host-side only. See [docs/remote.md](docs/remote.md) for how a future RDP/VNC decoder plugs in as a graphical surface.
+Keyboard and mouse (press/drag/release/wheel) forward to the host; window chrome — dragging, resizing, taskbar, Start menu — is still host-side only. Turn on Settings → Audio streaming and host audio (desktop, Amp, Vid, a bridged app) plays on the attached client too, over the same socket. See [docs/remote.md](docs/remote.md) and [docs/audio-stream.md](docs/audio-stream.md).
 
 ## Versioning
 

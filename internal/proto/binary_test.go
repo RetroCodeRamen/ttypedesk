@@ -137,6 +137,25 @@ func TestEncodeDecodeDiffFrameEmptyWindowList(t *testing.T) {
 	}
 }
 
+func TestEncodeDecodeAudioChunkRoundTrip(t *testing.T) {
+	samples := []int16{0, 1, -1, 32767, -32768, 12345, -12345}
+	got := DecodeAudioChunk(EncodeAudioChunk(samples))
+	if len(got) != len(samples) {
+		t.Fatalf("len(got) = %d, want %d", len(got), len(samples))
+	}
+	for i, s := range samples {
+		if got[i] != s {
+			t.Errorf("got[%d] = %d, want %d", i, got[i], s)
+		}
+	}
+}
+
+func TestEncodeAudioChunkEmpty(t *testing.T) {
+	if got := DecodeAudioChunk(EncodeAudioChunk(nil)); len(got) != 0 {
+		t.Errorf("got %v, want empty", got)
+	}
+}
+
 func TestDiffFrameIsMuchSmallerThanUnchangedJSON(t *testing.T) {
 	// The whole point: an unchanged window should cost almost nothing on
 	// a repeat frame, versus JSON re-encoding its full cell grid every

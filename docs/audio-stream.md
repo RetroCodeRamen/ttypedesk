@@ -1,53 +1,35 @@
-# Audio streaming (later)
+# Audio streaming
 
-**When:** after the main desktop is solid — not near-term.
-
-**Goal:** when using TTYPE Desk over SSH (or attach), play server-side audio on the **local** machine via a small remote client, ideally tunneled over the same SSH connection.
+**Goal:** when using TTYPE Desk over SSH (or attach), play server-side audio on the **local** machine via the same remote client used for the rest of the desktop.
 
 ## Why a client
 
-SSH TTYs don’t carry PCM. Something on the laptop must receive audio and play it (Pulse/PipeWire/ALSA/`afplay`/etc.). TTYPE Desk on the server captures or mixes; the **companion client** renders.
+SSH TTYs don't carry PCM. Something on the laptop must receive audio and play it. TTYPE Desk on the server captures the default sink's monitor; the existing `-attach` client plays it back — no separate companion binary.
 
-## Sketch
+## How it works
 
 ```text
-Server (TTYPE Desk host)              Client (your laptop)
+Server (TTYPE Desk host)              Client (-attach)
 ┌─────────────────────┐               ┌──────────────────┐
-│ App / bridge audio  │               │ ttypedesk-audio  │
-│   or Pulse monitor  │──encode──────►│ decode → speakers│
-└──────────┬──────────┘   (opus/pcm)  └────────▲─────────┘
+│ parec (default sink │──FrameAudio──►│ internal/audio    │
+│   .monitor)          │   (raw PCM)   │  .Play → speakers │
+└──────────┬──────────┘               └────────▲─────────┘
            │                                   │
-           └──── SSH tunnel / attach mux ──────┘
+           └──── same -listen/-attach socket ──┘
 ```
 
-## Transport options (pick later)
+`FrameAudio` chunks are muxed onto the same connection as `FrameDiff` cell updates and `FrameJSON` input, using the length-prefixed frame envelope from `internal/proto/binary.go` — one connection carries UI and sound together, no dedicated port or second SSH tunnel. Raw PCM, not a codec: over a local link or an already-compressed SSH transport, the format-negotiation and CPU cost of encoding didn't pay for itself yet.
 
-1. **SSH `-R`/`-L` TCP** — dedicated port for audio alongside the session (simple).
-2. **Same attach mux** — binary frames on the existing `-listen` protocol (`type: audio`) next to cell diffs.
-3. **Separate `ssh -W` / unix socket forward** — keep TTY clean.
+## Capture (server)
 
-Prefer (2) long-term so one `ttypedesk` remote client gets UI + sound; (1) is fine for an MVP experiment.
+`internal/audiocap` shells out to `parec --device=@DEFAULT_SINK@.monitor` — no linked capture library, matching the project's `ffmpeg`-for-Amp/Vid posture of soft runtime dependencies. This covers PulseAudio directly and PipeWire systems running `pipewire-pulse`, which is the default on nearly every modern desktop distro. It's desktop-wide: whatever's audible on the host — Amp, Vid, a bridge backend, system sounds — is already in the capture, so nothing separately routes those apps into the stream.
 
-## Capture sources (server)
+## Settings
 
-- Optional: monitor default Pulse/PipeWire sink (desktop-wide)
-- Bridge backends (BrowserNest / DisplayNest) may expose their own audio later
-- Mute / per-app routing = polish
+Settings → Audio streaming: **Enabled** (decided once per attach connection, at connect time) and **Mute** (checked live on every chunk, so it takes effect immediately without reattaching — capture keeps running, chunks are just dropped while muted). No bitrate control: there's no codec in the raw-PCM path to tune.
 
-## Non-goals (v1 audio)
+## Non-goals (still)
 
-- Perfect low-latency gaming audio
-- Bidirectional mic (could be phase 2)
-- Replacing PipeWire on the server
-
-## Phasing (when we get here)
-
-1. Spec binary audio frames + tiny `ttypedesk-audio` play-only client  
-2. Server: capture default monitor → Opus (or raw PCM for LAN)  
-3. Document `ssh -L` one-liner / integrate into attach client  
-4. Settings: enable stream, bitrate, mute  
-5. Optional mic uplink  
-
-## Dependencies
-
-Stable desktop + attach/SSH story first; notification/calendar/wallpaper/dock higher priority.
+- Bidirectional mic uplink — deferred, same as originally planned.
+- Perfect low-latency gaming audio.
+- An encoded (Opus) path — raw PCM covers the LAN/SSH case; revisit if bandwidth becomes a real complaint.

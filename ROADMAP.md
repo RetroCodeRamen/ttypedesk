@@ -224,18 +224,18 @@ Avoid building around Discord/Slack as the primary path (proprietary APIs / ToS)
 - [x] Bidirectional attach (input over socket) — keyboard to focused window; mouse press/drag/release/wheel hit-tests and forwards into content area, focusing on press. Window chrome (drag/resize/taskbar/Start menu) still local-only.
 - [x] Binary cell-diff framing (replace JSON snapshots) — `internal/proto`: length-prefixed `WriteFrame`/`ReadFrame` (4-byte length + type byte), `DiffFrame`/`DiffWindow` binary encoding (~15 bytes/cell vs ~70-90 for JSON). Window metadata sent every frame; each connection tracks its own last-sent cell grid per window and only re-sends a window's cells when they've actually changed since that connection last saw them — closed windows get pruned from the cache. Input (key/mouse/attach/detach) stays JSON, now wrapped in the same frame envelope (`FrameJSON`) instead of newline-delimited.
 
-## Audio streaming (later — after main desktop)
+## Audio streaming
 
-Stream server audio to a local companion client over SSH/attach. Cool for media in bridge apps **and** Amp/Vid; **not** near-term.
+Stream server audio to a local companion client over SSH/attach. Cool for media in bridge apps **and** Amp/Vid.
 
 Design: [docs/audio-stream.md](docs/audio-stream.md)
 
-- [ ] Audio capture on host (Pulse/PipeWire monitor and/or bridge backends)
-- [ ] Encode + mux (prefer attach protocol frames; SSH port-forward OK for MVP)
-- [ ] `ttypedesk-audio` (or combined remote client) play-only receiver
-- [ ] Settings: enable / bitrate / mute
-- [ ] Optional later: mic uplink
-- [ ] Feed Amp / Vid playback into this path when remote
+- [x] Audio capture on host — `internal/audiocap`, a `parec` subprocess against `@DEFAULT_SINK@.monitor` (covers PulseAudio and the pipewire-pulse compat layer nearly every modern distro ships; no `pw-record` path, since it has no equivalently portable "default sink monitor" name). Desktop-wide, so it picks up whatever's already playing — the desktop, a bridged app, Amp, Vid — not a per-app tap.
+- [x] Encode + mux — raw PCM as `FrameAudio` chunks on the existing attach mux (`internal/proto`'s `EncodeAudioChunk`/`DecodeAudioChunk`), muxed with `FrameDiff`/`FrameJSON` over the same `-listen`/`-attach` connection via a mutex-guarded frame writer. No separate SSH port-forward needed.
+- [x] Play-only receiver — folded into the existing `-attach` client rather than a separate `ttypedesk-audio` binary; decodes `FrameAudio` chunks straight into `internal/audio.Play`.
+- [x] Settings: enable / mute — Settings → Audio streaming. No bitrate control: this ships raw PCM, not an encoded codec, so there's no bitrate to tune yet (Opus was always the "pick later" option per this doc's own phasing).
+- [ ] Optional later: mic uplink — still explicitly deferred, not built.
+- [x] Feed Amp / Vid playback into this path when remote — automatic, not separate wiring: capture is desktop-wide (the default sink's monitor), so anything already audible on the host, including Amp/Vid, is already in the stream.
 
 ## Later / optional (distro & extras)
 
