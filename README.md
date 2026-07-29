@@ -14,6 +14,16 @@ Somewhere around the fourth time I alt-tabbed between six `tmux` panes and thoug
 
 **Want the deep dive instead of the tour?** → [MANUAL.md](MANUAL.md) covers every subsystem in detail. This README is the highlight reel.
 
+## Quick start
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RetroCodeRamen/ttypedesk/master/install.sh | bash
+```
+
+Linux only. Handles build deps, a Go toolchain if yours is too old, cloning,
+and building — drops `ttypedesk` in `~/.local/bin`, ready to run. Details,
+verification, and the manual-build path: [Install](#install-one-liner) below.
+
 ## The tour
 
 Start menu, opened the normal way — hover for flyouts, click to launch:
