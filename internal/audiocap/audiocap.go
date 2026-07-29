@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"strings"
 	"sync"
 )
 
@@ -39,6 +40,25 @@ type Event struct {
 	Err error
 }
 
+// defaultMonitorSource resolves parec's device argument to the current
+// default sink's monitor. parec's own "@DEFAULT_SINK@.monitor" magic
+// token exists for exactly this, but confirmed unreliable in at least one
+// real environment (a minimal container running PulseAudio 16.1: it
+// fails outright with "Stream error: Invalid argument", while the same
+// monitor addressed by its literal resolved name works fine) — resolving
+// it ourselves via `pactl get-default-sink` sidesteps whatever's wrong
+// with parec's own resolution. Falls back to the magic token if pactl
+// itself is unavailable or fails, which is no worse than what shipped
+// before this existed.
+func defaultMonitorSource() string {
+	out, err := exec.Command("pactl", "get-default-sink").Output()
+	sink := strings.TrimSpace(string(out))
+	if err != nil || sink == "" {
+		return "@DEFAULT_SINK@.monitor"
+	}
+	return sink + ".monitor"
+}
+
 // Stream captures raw PCM from the default sink's monitor via a parec
 // subprocess. PCM delivers interleaved int16 samples at SampleRate/Channels.
 type Stream struct {
@@ -56,7 +76,7 @@ func Capture(events chan<- Event) (*Stream, error) {
 		return nil, fmt.Errorf("audiocap: parec not found on PATH — install pulseaudio-utils (or pipewire-pulse) to stream audio")
 	}
 	cmd := exec.Command("parec",
-		"--device=@DEFAULT_SINK@.monitor",
+		"--device="+defaultMonitorSource(),
 		"--rate", fmt.Sprint(SampleRate),
 		"--channels", fmt.Sprint(Channels),
 		"--format=s16le",
