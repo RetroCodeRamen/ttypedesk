@@ -1,0 +1,11 @@
+TTYPE Desk
+Copyright 2026 RetroCodeRamen
+
+This product includes software developed by RetroCodeRamen
+(https://github.com/RetroCodeRamen/ttypedesk), licensed under the
+Apache License, Version 2.0. See LICENSE for the full license text.
+
+This product bundles a vendored copy of libvterm 0.3.3
+(third_party/libvterm-0.3.3), Copyright (c) 2008 Paul Evans
+<leonerd@leonerd.org.uk>, licensed under the MIT License — see
+third_party/libvterm-0.3.3/LICENSE for its full license text.

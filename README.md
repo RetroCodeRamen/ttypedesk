@@ -1,6 +1,7 @@
 # TTYPE Desk
 
 [![GitHub](https://img.shields.io/badge/GitHub-RetroCodeRamen%2Fttypedesk-181717?logo=github)](https://github.com/RetroCodeRamen/ttypedesk)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 <p align="center">
   <img src="images/Desktop.png" alt="TTYPE Desk screenshot — draggable windows, a taskbar, and a start menu, all rendered in a terminal" width="700">
@@ -263,3 +264,14 @@ pkg/
 apps/clock         reference app
 apps/imageview     graphical demo
 ```
+
+## License
+
+[Apache License 2.0](LICENSE) — open, permissive, use it in whatever
+you're building, closed-source or not. Just keep the copyright notice
+and license text attached (that's the whole "accreditation" part), and
+if you distribute a modified version, say so in the changed files.
+
+Vendored `libvterm` (`third_party/libvterm-0.3.3`) keeps its own
+[MIT license](third_party/libvterm-0.3.3/LICENSE) — see [NOTICE](NOTICE)
+for the full attribution.
