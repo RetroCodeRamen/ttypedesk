@@ -744,7 +744,7 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 				if n != nil {
 					n.Post(title, body, "🔔", "settings")
 				}
-			}, func() {
+			}, s.lanchat, func() {
 				if n != nil {
 					n.DismissAll()
 				}

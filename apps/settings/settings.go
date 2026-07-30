@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/lanchat"
 	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
 	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
@@ -17,8 +18,9 @@ type App struct {
 	onSave   func(config.Config)
 	onNotify func(title, body string)
 	onClearN func()
+	lanchat  *lanchat.Service // nil if it failed to start (see server.New) — the LAN Chat page then reports unavailable
 	ctx      *uiapp.Context
-	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about, 10 calendar, 11 audio streaming
+	page     int // 0 menu, 1 appearance, 2 terminal, 3 desktop, 4 notify, 5 default apps, 6 apps, 7 input, 8 advanced, 9 about, 10 calendar, 11 audio streaming, 12 LAN chat
 	sel      int
 	editing  bool
 	editBuf  string
@@ -32,8 +34,8 @@ type App struct {
 	calResults      chan calMsg
 }
 
-func New(cfg config.Config, onSave func(config.Config), onNotify func(title, body string), onClearNotices ...func()) *App {
-	a := &App{cfg: cfg, onSave: onSave, onNotify: onNotify, page: 0}
+func New(cfg config.Config, onSave func(config.Config), onNotify func(title, body string), lc *lanchat.Service, onClearNotices ...func()) *App {
+	a := &App{cfg: cfg, onSave: onSave, onNotify: onNotify, lanchat: lc, page: 0}
 	if len(onClearNotices) > 0 {
 		a.onClearN = onClearNotices[0]
 	}
@@ -122,7 +124,7 @@ func (a *App) key(e uiapp.Event) error {
 func (a *App) activate() {
 	switch a.page {
 	case 0:
-		items := 11
+		items := 12
 		if a.sel >= items {
 			a.sel = items - 1
 		}
@@ -149,6 +151,8 @@ func (a *App) activate() {
 			a.page, a.sel = 10, 0
 		case 10:
 			a.page, a.sel = 11, 0
+		case 11:
+			a.page, a.sel = 12, 0
 		}
 	case 1: // appearance
 		switch a.sel {
@@ -462,6 +466,27 @@ func (a *App) activate() {
 			a.persist()
 			a.status = fmt.Sprintf("Audio streaming muted: %v", a.cfg.AudioStream.Mute)
 		}
+	case 12: // LAN chat
+		if a.lanchat == nil {
+			return
+		}
+		switch a.sel {
+		case 0:
+			_, name := a.lanchat.Self()
+			a.editing = true
+			a.editBuf = name
+			a.status = "Edit display name — Enter to apply"
+		case 1:
+			// Immediate, no confirmation — matches every other destructive
+			// reset in Settings. Regenerating is a deliberate "become a
+			// new identity" operation (see lanchat.Service.RegenerateIdentity's
+			// doc comment): existing peers will see you as a stranger again.
+			if err := a.lanchat.RegenerateIdentity(); err != nil {
+				a.status = "Couldn't regenerate identity: " + err.Error()
+			} else {
+				a.status = "New identity generated — you'll appear as a new peer to others"
+			}
+		}
 	}
 }
 
@@ -574,6 +599,17 @@ func (a *App) commitEdit() {
 			}
 			a.hkEdit = ""
 		}
+	case 12:
+		if a.sel == 0 && a.lanchat != nil {
+			name := strings.TrimSpace(a.editBuf)
+			if name == "" {
+				a.status = "Display name unchanged (empty)"
+			} else if err := a.lanchat.SetDisplayName(name); err != nil {
+				a.status = "Couldn't save name: " + err.Error()
+			} else {
+				a.status = "Display name: " + name
+			}
+		}
 	}
 }
 
@@ -644,6 +680,7 @@ func (a *App) lines() []string {
 			"About",
 			"Calendar",
 			"Audio streaming",
+			"LAN Chat",
 		}
 	case 1:
 		path := a.cfg.Wallpaper.Path
@@ -781,6 +818,19 @@ func (a *App) lines() []string {
 		return []string{
 			fmt.Sprintf("Stream audio to attached remote clients: %s", on[a.cfg.AudioStream.Enabled]),
 			fmt.Sprintf("Mute streaming (host playback unaffected): %s", on[a.cfg.AudioStream.Mute]),
+		}
+	case 12:
+		if a.lanchat == nil {
+			return []string{"LAN chat is unavailable (failed to start)"}
+		}
+		id, name := a.lanchat.Self()
+		fp := string(id)
+		if len(fp) > 12 {
+			fp = fp[:12]
+		}
+		return []string{
+			fmt.Sprintf("Display name: %s", name),
+			fmt.Sprintf("Regenerate identity (fingerprint %s…)", fp),
 		}
 	default:
 		ssh := "no"
