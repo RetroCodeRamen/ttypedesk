@@ -185,3 +185,16 @@ func (s *Service) Self() (PeerID, string) {
 	defer s.mu.Unlock()
 	return s.self, s.displayName
 }
+
+// selfID is s.self read under the lock — regenerateIdentity writes it
+// under the same lock (a rare, explicit user action, but concurrent with
+// every other goroutine that's ever running), so every read outside a
+// block that already holds mu must go through this, not a bare field
+// read, or it's a data race (caught for real by CI's -race run once,
+// see the git history around this comment). Never call this from code
+// that already holds mu — sync.Mutex isn't reentrant.
+func (s *Service) selfID() PeerID {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.self
+}

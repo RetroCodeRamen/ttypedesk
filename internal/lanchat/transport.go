@@ -80,7 +80,7 @@ func (s *Service) acceptLoop() {
 // always waits to accept — deterministic, no extra coordination or
 // races between both sides trying to dial simultaneously.
 func (s *Service) connectIfNeeded(peer PeerID) {
-	if s.self >= peer {
+	if s.selfID() >= peer {
 		return
 	}
 	s.mu.Lock()
@@ -145,7 +145,13 @@ func (s *Service) handleConn(nc net.Conn, weDialed bool) {
 	pc := &peerConn{nc: nc, w: bufio.NewWriter(nc)}
 	r := bufio.NewReader(nc)
 
-	if err := pc.send(wireHello, wireHelloMsg{PeerID: s.self, Name: s.selfName()}); err != nil {
+	// Captured once, not re-read per use below: a consistent view of our
+	// own identity for the whole handshake, and — since it's read via
+	// selfID(), not the bare field — safe even if RegenerateIdentity runs
+	// concurrently on another goroutine mid-handshake.
+	self := s.selfID()
+
+	if err := pc.send(wireHello, wireHelloMsg{PeerID: self, Name: s.selfName()}); err != nil {
 		return
 	}
 	line, err := r.ReadBytes('\n')
@@ -157,7 +163,7 @@ func (s *Service) handleConn(nc net.Conn, weDialed bool) {
 		return
 	}
 	hello, err := decodeWirePayload[wireHelloMsg](env)
-	if err != nil || hello.PeerID == "" || hello.PeerID == s.self {
+	if err != nil || hello.PeerID == "" || hello.PeerID == self {
 		return
 	}
 	pc.id = hello.PeerID
@@ -176,7 +182,7 @@ func (s *Service) handleConn(nc net.Conn, weDialed bool) {
 	// preferring it consistently here means both sides converge on
 	// keeping the *same* survivor instead of two uncoordinated,
 	// independent local choices.
-	canonical := (weDialed && s.self < pc.id) || (!weDialed && pc.id < s.self)
+	canonical := (weDialed && self < pc.id) || (!weDialed && pc.id < self)
 
 	s.mu.Lock()
 	if old, ok := s.conns[pc.id]; ok {
@@ -281,8 +287,9 @@ func (s *Service) syncOnConnect(pc *peerConn) {
 	for _, msg := range announces {
 		pc.send(wireRoomAnnounce, msg)
 	}
+	self := s.selfID()
 	for _, id := range joined {
-		pc.send(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: s.self})
+		pc.send(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: self})
 	}
 }
 

@@ -261,6 +261,35 @@ func TestRoomPersistsAcrossRestart(t *testing.T) {
 	}
 }
 
+// TestRegenerateIdentityConcurrentWithDiscoveryIsRace-free is a
+// regression test for a real data race CI caught: RegenerateIdentity
+// writes s.self under s.mu, but several other code paths (notably
+// discovery.go's applyBeacon, hit continuously by a second real
+// instance's beacons) used to read the bare field without the lock.
+// Two real Services, real broadcast discovery between them, and
+// RegenerateIdentity called repeatedly on one while the other keeps
+// beaconing — this only proves anything under `go test -race`.
+func TestRegenerateIdentityConcurrentWithDiscoveryIsRaceFree(t *testing.T) {
+	a := newTestService(t, "Alice")
+	b := newTestService(t, "Bob")
+
+	bID, _ := b.Self()
+	waitFor(t, 10*time.Second, "a discovers b", func() bool {
+		for _, p := range a.Peers() {
+			if p.ID == bID && p.Online {
+				return true
+			}
+		}
+		return false
+	})
+
+	for i := 0; i < 20; i++ {
+		if err := a.RegenerateIdentity(); err != nil {
+			t.Fatalf("RegenerateIdentity(%d) = %v", i, err)
+		}
+	}
+}
+
 func TestSendMessageFailsWhenNotJoined(t *testing.T) {
 	a := newTestService(t, "Alice")
 	if err := a.SendMessage(RoomID("unknown-room"), "hi"); err == nil {

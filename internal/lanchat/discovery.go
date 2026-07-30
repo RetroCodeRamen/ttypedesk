@@ -222,7 +222,7 @@ func (s *Service) listenLoop() {
 // it (if we're the dialing side — see connectIfNeeded) and emits
 // EventPeerOnline.
 func (s *Service) applyBeacon(b beacon, srcIP net.IP) {
-	if b.PeerID == "" || b.PeerID == s.self {
+	if b.PeerID == "" || b.PeerID == s.selfID() {
 		return
 	}
 	addr := net.JoinHostPort(srcIP.String(), strconv.Itoa(b.TCPPort))

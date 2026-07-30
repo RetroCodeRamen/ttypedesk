@@ -16,8 +16,9 @@ import (
 // different, non-colliding IDs (see the plan's note on rooms having no
 // global uniqueness).
 func (s *Service) CreateRoom(name string) RoomID {
+	self := s.selfID()
 	now := time.Now()
-	id := roomID(s.self, name, now.UnixNano())
+	id := roomID(self, name, now.UnixNano())
 
 	s.mu.Lock()
 	s.rooms[id] = &roomState{
@@ -25,7 +26,7 @@ func (s *Service) CreateRoom(name string) RoomID {
 			ID:        id,
 			Name:      name,
 			Joined:    true,
-			CreatedBy: s.self,
+			CreatedBy: self,
 			CreatedAt: now,
 		},
 		seen:  map[string]bool{},
@@ -36,9 +37,9 @@ func (s *Service) CreateRoom(name string) RoomID {
 
 	s.persistRoom(id)
 	s.broadcastToConns(wireRoomAnnounce, wireRoomAnnounceMsg{
-		RoomID: id, Name: name, CreatedBy: s.self, CreatedAt: now.UnixNano(),
+		RoomID: id, Name: name, CreatedBy: self, CreatedAt: now.UnixNano(),
 	}, "")
-	s.broadcastToConns(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: s.self}, "")
+	s.broadcastToConns(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: self}, "")
 	return id
 }
 
@@ -57,7 +58,7 @@ func (s *Service) JoinRoom(id RoomID) {
 	s.mu.Unlock()
 
 	s.persistRoom(id)
-	s.broadcastToConns(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: s.self}, "")
+	s.broadcastToConns(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: s.selfID()}, "")
 }
 
 // DMRoom returns the room ID for a direct-message conversation with
@@ -71,7 +72,8 @@ func (s *Service) JoinRoom(id RoomID) {
 // doc and handleEnvelope's room_join case for why that doesn't leak a
 // DM's existence or content to anyone but the real other participant.
 func (s *Service) DMRoom(peer PeerID) RoomID {
-	id := dmRoomID(s.self, peer)
+	self := s.selfID()
+	id := dmRoomID(self, peer)
 
 	s.mu.Lock()
 	if r, ok := s.rooms[id]; !ok {
@@ -93,7 +95,7 @@ func (s *Service) DMRoom(peer PeerID) RoomID {
 	s.mu.Unlock()
 
 	s.persistRoom(id)
-	s.broadcastToConns(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: s.self}, "")
+	s.broadcastToConns(wireRoomJoin, wireRoomJoinMsg{RoomID: id, PeerID: self}, "")
 	return id
 }
 
@@ -193,7 +195,7 @@ func (s *Service) applyRoomAnnounce(msg wireRoomAnnounceMsg) {
 // doesn't attempt store-and-forward relaying of history through
 // intermediate peers.
 func (s *Service) applyRoomJoin(from *peerConn, id RoomID, joiner PeerID) {
-	if joiner == "" || joiner == s.self {
+	if joiner == "" || joiner == s.selfID() {
 		return
 	}
 	s.mu.Lock()
