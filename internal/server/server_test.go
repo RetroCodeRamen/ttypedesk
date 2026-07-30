@@ -585,42 +585,6 @@ func TestCreateAppVidRendersWithoutCrashing(t *testing.T) {
 	}
 }
 
-func TestCreateAppChatRendersWithoutCrashing(t *testing.T) {
-	// Chat's Init tries to resume a saved session from credstore, which
-	// reads $HOME — isolate it so this test never attempts a real network
-	// connection just because the actual user happens to have a saved
-	// Matrix session on this machine.
-	t.Setenv("HOME", t.TempDir())
-	s := newTestServer()
-	win, err := s.CreateApp("chat", "Chat")
-	if err != nil {
-		t.Fatalf("CreateApp: %v", err)
-	}
-	defer s.CloseWindow(win.ID)
-
-	_ = win.Surface.ProduceDiff()
-	cells := win.Surface.Snapshot()
-	if len(cells) == 0 {
-		t.Fatal("Snapshot() returned no cells")
-	}
-	// Chat starts on the login screen (no stored session in a fresh test
-	// server) — type into it and tab between fields without a real
-	// network connection ever being attempted.
-	for _, r := range []rune("matrix.org") {
-		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Rune: r}); err != nil {
-			t.Fatalf("HandleInput rune %q: %v", r, err)
-		}
-	}
-	for _, key := range []string{"Tab", "Tab", "Up"} {
-		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: key}); err != nil {
-			t.Fatalf("HandleInput %s: %v", key, err)
-		}
-	}
-	if title := win.Surface.Title(); strings.Contains(title, "crashed") {
-		t.Fatalf("Title() = %q — Chat crashed during basic interaction", title)
-	}
-}
-
 func TestCreateFilePickerOpensWindow(t *testing.T) {
 	s := newTestServer()
 	home := t.TempDir()

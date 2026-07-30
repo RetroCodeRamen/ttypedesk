@@ -18,7 +18,13 @@ import (
 // implementation of the protocol (see docs/extapp.md), not a mock, so
 // these tests exercise an actual subprocess round trip exactly like
 // internal/ffdecode and internal/audiocap's tests do with ffmpeg/parec.
-var helloBinary string
+//
+// matrixchatBinary is cmd/matrixchat — apps/matrixchat run through
+// pkg/extapprun's generic adapter instead of a hand-written protocol
+// implementation like extapp-hello's, so building and driving it here
+// proves the generic adapter works against a real, pre-existing
+// uiapp.App and not just extapprun's own fakeApp test double.
+var helloBinary, matrixchatBinary string
 
 func TestMain(m *testing.M) {
 	dir, err := os.MkdirTemp("", "extapp-test-*")
@@ -31,6 +37,13 @@ func TestMain(m *testing.M) {
 	if err := build.Run(); err != nil {
 		os.RemoveAll(dir)
 		panic("building extapp-hello fixture: " + err.Error())
+	}
+	matrixchatBinary = filepath.Join(dir, "matrixchat")
+	build = exec.Command("go", "build", "-o", matrixchatBinary, "../../cmd/matrixchat")
+	build.Stderr = os.Stderr
+	if err := build.Run(); err != nil {
+		os.RemoveAll(dir)
+		panic("building matrixchat fixture: " + err.Error())
 	}
 	code := m.Run()
 	os.RemoveAll(dir)

@@ -1,10 +1,16 @@
-// Package chat is a text-only Matrix client — login, room list, timeline,
-// send text. Connects to an existing homeserver (matrix.org or any
-// other); TTYPE Desk never runs or manages a chat backend of its own.
+// Package matrixchat is a text-only Matrix client — login, room list,
+// timeline, send text. Connects to an existing homeserver (matrix.org or
+// any other); TTYPE Desk never runs or manages a chat backend of its own.
 // E2EE is explicitly out of scope for this first pass (a real, separate
 // undertaking — device verification, key backup, cross-signing — not an
 // incremental add); Phase 2 in ROADMAP.md terms.
-package chat
+//
+// This is no longer a built-in app — install via the App Store (see
+// docs/appstore.md) or build cmd/matrixchat directly. It runs
+// out-of-process, via pkg/extapprun, unchanged from its original
+// in-process form (its uiapp.App/Context/Host usage never depended on
+// AppSurface specifics) — see docs/extapp.md.
+package matrixchat
 
 import (
 	"context"
