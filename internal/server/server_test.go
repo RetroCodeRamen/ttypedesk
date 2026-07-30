@@ -12,15 +12,23 @@ import (
 )
 
 // newTestServer returns a Server sized like a typical host terminal, using
-// the default (top-docked) taskbar.
-func newTestServer() *Server {
+// the default (top-docked) taskbar. It also registers a t.Cleanup to
+// close the real lanchat.Service New() starts (live goroutines + open
+// UDP/TCP sockets) — without it, every one of this file's ~35 callers
+// leaks one for the life of the test binary.
+func newTestServer(t *testing.T) *Server {
 	s := New(config.Default())
 	s.SetHostSize(120, 40)
+	t.Cleanup(func() {
+		if lc := s.LANChatService(); lc != nil {
+			_ = lc.Close()
+		}
+	})
 	return s
 }
 
 func TestCreateAppUnknown(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	if _, err := s.CreateApp("does-not-exist", "Nope"); err == nil {
 		t.Fatal("expected error for unknown app name")
 	}
@@ -30,7 +38,7 @@ func TestCreateAppUnknown(t *testing.T) {
 }
 
 func TestCreateAppAndFocus(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, err := s.CreateApp("clock", "Clock")
 	if err != nil {
 		t.Fatalf("CreateApp: %v", err)
@@ -50,7 +58,7 @@ func TestCreateAppAndFocus(t *testing.T) {
 }
 
 func TestFocusReordersZAndOrder(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	a, _ := s.CreateApp("clock", "Clock")
 	b, _ := s.CreateApp("notes", "Notes")
 	// b was created last, so it's focused and on top.
@@ -71,7 +79,7 @@ func TestFocusReordersZAndOrder(t *testing.T) {
 }
 
 func TestFocusOrCreateAppReusesWindow(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	first, err := s.CreateApp("clock", "Clock")
 	if err != nil {
 		t.Fatalf("CreateApp: %v", err)
@@ -91,7 +99,7 @@ func TestFocusOrCreateAppReusesWindow(t *testing.T) {
 }
 
 func TestCloseWindowRefocusesTopmost(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	a, _ := s.CreateApp("clock", "Clock")
 	b, _ := s.CreateApp("notes", "Notes")
 
@@ -116,7 +124,7 @@ func TestCloseWindowRefocusesTopmost(t *testing.T) {
 }
 
 func TestMoveClampsToDesktopInset(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 
 	s.Move(win.ID, -5, -5)
@@ -132,7 +140,7 @@ func TestMoveClampsToDesktopInset(t *testing.T) {
 }
 
 func TestMoveIgnoredWhenMaximized(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 	s.ToggleMaximize(win.ID)
 	x, y := win.X, win.Y
@@ -143,7 +151,7 @@ func TestMoveIgnoredWhenMaximized(t *testing.T) {
 }
 
 func TestResizeWindowEnforcesMinimum(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 
 	s.ResizeWindow(win.ID, 1, 1)
@@ -153,7 +161,7 @@ func TestResizeWindowEnforcesMinimum(t *testing.T) {
 }
 
 func TestSetGeometryClampsToHostBounds(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 
 	// Host is 120x40; ask for a window that overshoots the right/bottom edge.
@@ -167,7 +175,7 @@ func TestSetGeometryClampsToHostBounds(t *testing.T) {
 }
 
 func TestToggleMaximizeRoundTrips(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 	origX, origY, origW, origH := win.X, win.Y, win.W, win.H
 
@@ -191,7 +199,7 @@ func TestToggleMaximizeRoundTrips(t *testing.T) {
 }
 
 func TestSnapTileAndRestore(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 	origX, origY, origW, origH := win.X, win.Y, win.W, win.H
 
@@ -212,7 +220,7 @@ func TestSnapTileAndRestore(t *testing.T) {
 }
 
 func TestSnapUnknownRegionIsNoop(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 	x, y, w, h := win.X, win.Y, win.W, win.H
 	s.Snap(win.ID, "diagonal")
@@ -222,7 +230,7 @@ func TestSnapUnknownRegionIsNoop(t *testing.T) {
 }
 
 func TestToggleMinimizeMovesFocusToNextVisible(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	a, _ := s.CreateApp("clock", "Clock")
 	b, _ := s.CreateApp("notes", "Notes")
 
@@ -244,7 +252,7 @@ func TestToggleMinimizeMovesFocusToNextVisible(t *testing.T) {
 }
 
 func TestNudgeMovesAndResizes(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 	x, y, w, h := win.X, win.Y, win.W, win.H
 
@@ -258,7 +266,7 @@ func TestNudgeMovesAndResizes(t *testing.T) {
 }
 
 func TestNudgeIgnoredWhenMaximizedOrMinimized(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, _ := s.CreateApp("clock", "Clock")
 	s.ToggleMaximize(win.ID)
 	x, y, w, h := win.X, win.Y, win.W, win.H
@@ -277,7 +285,7 @@ func TestNudgeIgnoredWhenMaximizedOrMinimized(t *testing.T) {
 }
 
 func TestLaunchActionKnownAndUnknown(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	if err := s.LaunchAction("notes"); err != nil {
 		t.Fatalf("LaunchAction(notes): %v", err)
 	}
@@ -300,7 +308,7 @@ func TestCreateProgramBridgeRoutesThroughBridgeNotShell(t *testing.T) {
 	if _, err := exec.LookPath("Xvfb"); err == nil {
 		t.Skip("Xvfb is on PATH in this environment; this test wants it absent")
 	}
-	s := newTestServer()
+	s := newTestServer(t)
 	p := config.Program{ID: "p1", Name: "Definitely Not A Shell Command", Command: "totally-bogus-x11-app-xyz", Bridge: true}
 	if _, err := s.CreateProgram(p); err == nil {
 		t.Fatal("expected an error creating a Bridge program without Xvfb available")
@@ -317,7 +325,7 @@ func TestCreateProgramBridgeRoutesThroughBridgeNotShell(t *testing.T) {
 // path (which always succeeds at the Go level — sh starts fine even if
 // the command inside it doesn't exist).
 func TestCreateProgramWithoutBridgeStillUsesShell(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	p := config.Program{ID: "p2", Name: "Plain Shell Program", Command: "totally-bogus-x11-app-xyz"}
 	win, err := s.CreateProgram(p)
 	if err != nil {
@@ -335,7 +343,7 @@ func TestCreateProgramWithoutBridgeStillUsesShell(t *testing.T) {
 // differently (a real exec.Command lookup error) than "sh started fine,
 // the command inside it just doesn't exist."
 func TestCreateProgramExtAppRoutesThroughExtAppNotShell(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	p := config.Program{ID: "p3", Name: "Definitely Not A Shell Command", Command: "totally-bogus-extapp-binary-xyz", ExtApp: true}
 	if _, err := s.CreateProgram(p); err == nil {
 		t.Fatal("expected an error creating an ExtApp program with a nonexistent binary")
@@ -348,7 +356,7 @@ func TestCreateProgramExtAppRoutesThroughExtAppNotShell(t *testing.T) {
 }
 
 func TestCaptureAndRestoreSessionRoundTrips(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	a, _ := s.CreateApp("clock", "Clock")
 	b, _ := s.CreateApp("notes", "Notes")
 	s.SetGeometry(a.ID, 5, 5, 30, 10)
@@ -360,7 +368,7 @@ func TestCaptureAndRestoreSessionRoundTrips(t *testing.T) {
 		t.Fatalf("CaptureSession() len = %d, want 2", len(st.Windows))
 	}
 
-	s2 := newTestServer()
+	s2 := newTestServer(t)
 	n := s2.RestoreSession(st)
 	if n != 2 {
 		t.Fatalf("RestoreSession() restored %d windows, want 2", n)
@@ -380,7 +388,7 @@ func TestCaptureAndRestoreSessionRoundTrips(t *testing.T) {
 }
 
 func TestCaptureSessionSkipsTransientDialogs(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	s.CreateApp("appstore", "App Store")
 	st := s.CaptureSession()
 	if len(st.Windows) != 0 {
@@ -389,7 +397,7 @@ func TestCaptureSessionSkipsTransientDialogs(t *testing.T) {
 }
 
 func TestRestoreSessionSkipsBlankActions(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	n := s.RestoreSession(session.State{Windows: []session.Entry{{Action: ""}}})
 	if n != 0 {
 		t.Fatalf("RestoreSession restored %d windows for a blank action, want 0", n)
@@ -397,7 +405,7 @@ func TestRestoreSessionSkipsBlankActions(t *testing.T) {
 }
 
 func TestCloseAllClearsWindows(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	s.CreateApp("clock", "Clock")
 	s.CreateApp("notes", "Notes")
 	s.CloseAll()
@@ -447,7 +455,7 @@ func TestNear(t *testing.T) {
 }
 
 func TestOpenFileManagerDefaultsToBuiltinFiles(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, err := s.openFileManager("")
 	if err != nil {
 		t.Fatalf("openFileManager: %v", err)
@@ -459,7 +467,7 @@ func TestOpenFileManagerDefaultsToBuiltinFiles(t *testing.T) {
 }
 
 func TestOpenFileManagerFallsBackWhenRoleProgramMissing(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	cfg := s.Config()
 	cfg.Roles.FileMgr = "prog:does-not-exist"
 	s.SetConfig(cfg)
@@ -475,7 +483,7 @@ func TestOpenFileManagerFallsBackWhenRoleProgramMissing(t *testing.T) {
 }
 
 func TestOpenFileManagerUsesRoleProgram(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	cfg := s.Config()
 	cfg.Programs = append(cfg.Programs, config.Program{ID: "appstore-superfile", Name: "SuperFile", Command: "true"})
 	cfg.Roles.FileMgr = "prog:appstore-superfile"
@@ -495,7 +503,7 @@ func TestOpenFileManagerUsesRoleProgram(t *testing.T) {
 }
 
 func TestLaunchActionFilesRoutesThroughFileManagerRole(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	cfg := s.Config()
 	cfg.Programs = append(cfg.Programs, config.Program{ID: "appstore-superfile", Name: "SuperFile", Command: "true"})
 	cfg.Roles.FileMgr = "prog:appstore-superfile"
@@ -523,7 +531,7 @@ func TestLaunchActionBridgeCreatesWindow(t *testing.T) {
 		t.Skip("xclock not on PATH, skipping (apt install x11-apps to run this locally)")
 	}
 
-	s := newTestServer()
+	s := newTestServer(t)
 	if err := s.LaunchAction("bridge:xclock"); err != nil {
 		t.Fatalf("LaunchAction(bridge:xclock): %v", err)
 	}
@@ -545,7 +553,7 @@ func TestLaunchActionBridgeCreatesWindow(t *testing.T) {
 }
 
 func TestCreateAppAmpRendersWithoutCrashing(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, err := s.CreateApp("amp", "Amp")
 	if err != nil {
 		t.Fatalf("CreateApp: %v", err)
@@ -577,7 +585,7 @@ func TestCreateAppAmpRendersWithoutCrashing(t *testing.T) {
 }
 
 func TestCreateAppVidRendersWithoutCrashing(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	win, err := s.CreateApp("vid", "Vid")
 	if err != nil {
 		t.Fatalf("CreateApp: %v", err)
@@ -604,8 +612,64 @@ func TestCreateAppVidRendersWithoutCrashing(t *testing.T) {
 	}
 }
 
+func TestCreateAppChatRendersWithoutCrashing(t *testing.T) {
+	s := newTestServer(t)
+	win, err := s.CreateApp("chat", "Chat")
+	if err != nil {
+		t.Fatalf("CreateApp: %v", err)
+	}
+	defer s.CloseWindow(win.ID)
+
+	_ = win.Surface.ProduceDiff()
+	cells := win.Surface.Snapshot()
+	if len(cells) == 0 {
+		t.Fatal("Snapshot() returned no cells")
+	}
+
+	// First run: pick a display name.
+	for _, r := range []rune("Tester") {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Rune: r}); err != nil {
+			t.Fatalf("HandleInput rune %q: %v", r, err)
+		}
+	}
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Enter"}); err != nil {
+		t.Fatalf("HandleInput Enter (submit name): %v", err)
+	}
+
+	// Create a room via the "+ New room" entry (selected by default) and
+	// send a message in it.
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Enter"}); err != nil {
+		t.Fatalf("HandleInput Enter (open new-room prompt): %v", err)
+	}
+	for _, r := range []rune("General") {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Rune: r}); err != nil {
+			t.Fatalf("HandleInput rune %q: %v", r, err)
+		}
+	}
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Enter"}); err != nil {
+		t.Fatalf("HandleInput Enter (create room): %v", err)
+	}
+	for _, r := range []rune("hello") {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Rune: r}); err != nil {
+			t.Fatalf("HandleInput rune %q: %v", r, err)
+		}
+	}
+	if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: "Enter"}); err != nil {
+		t.Fatalf("HandleInput Enter (send message): %v", err)
+	}
+	for _, key := range []string{"Tab", "Up", "Down"} {
+		if err := win.Surface.HandleInput(surface.InputEvent{Kind: "key", Key: key}); err != nil {
+			t.Fatalf("HandleInput %s: %v", key, err)
+		}
+	}
+
+	if title := win.Surface.Title(); strings.Contains(title, "crashed") {
+		t.Fatalf("Title() = %q — Chat crashed during basic interaction", title)
+	}
+}
+
 func TestCreateFilePickerOpensWindow(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	home := t.TempDir()
 	win, err := s.CreateFilePicker(home, nil, func(string, bool) {})
 	if err != nil {
@@ -621,7 +685,7 @@ func TestCreateFilePickerOpensWindow(t *testing.T) {
 }
 
 func TestCreateFilePickerEscCancels(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	home := t.TempDir()
 	var gotPath string
 	var gotOK, called bool
@@ -648,7 +712,7 @@ func TestCreateFilePickerEscCancels(t *testing.T) {
 }
 
 func TestCreateFilePickerPicksFile(t *testing.T) {
-	s := newTestServer()
+	s := newTestServer(t)
 	home := t.TempDir()
 	if err := os.WriteFile(home+"/pick-me.txt", []byte("x"), 0o644); err != nil {
 		t.Fatalf("write fixture: %v", err)

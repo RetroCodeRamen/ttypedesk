@@ -13,6 +13,7 @@ import (
 	"github.com/RetroCodeRamen/ttypedesk/apps/amp"
 	"github.com/RetroCodeRamen/ttypedesk/apps/appstore"
 	"github.com/RetroCodeRamen/ttypedesk/apps/calendar"
+	"github.com/RetroCodeRamen/ttypedesk/apps/chat"
 	"github.com/RetroCodeRamen/ttypedesk/apps/clock"
 	"github.com/RetroCodeRamen/ttypedesk/apps/filepicker"
 	"github.com/RetroCodeRamen/ttypedesk/apps/files"
@@ -24,6 +25,7 @@ import (
 	"github.com/RetroCodeRamen/ttypedesk/apps/vid"
 	"github.com/RetroCodeRamen/ttypedesk/internal/bridge"
 	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/lanchat"
 	"github.com/RetroCodeRamen/ttypedesk/internal/notify"
 	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
 	"github.com/RetroCodeRamen/ttypedesk/internal/session"
@@ -66,6 +68,7 @@ type Server struct {
 	cfg      config.Config
 	onConfig func(config.Config)
 	notify   *notify.Service
+	lanchat  *lanchat.Service // nil if it failed to start (see New) — Chat then reports unavailable rather than crashing the desktop
 	windows  map[string]*Window
 	order    []string // bottom to top z
 	focus    string
@@ -87,16 +90,30 @@ type Server struct {
 func New(cfg config.Config) *Server {
 	n := notify.New()
 	n.Configure(cfg.Notify.Persist, cfg.Notify.MaxHist)
+	lc, err := lanchat.New("", n)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "lanchat: failed to start, Chat will be unavailable:", err)
+		lc = nil
+	}
 	return &Server{
 		cfg:     cfg,
 		windows: make(map[string]*Window),
 		notify:  n,
+		lanchat: lc,
 		dock:    cfg.TaskbarDock(),
 	}
 }
 
 func (s *Server) NotifyService() *notify.Service {
 	return s.notify
+}
+
+// LANChatService returns the shared decentralized Chat backend, or nil
+// if it failed to start (see New) — instantiated once for the process
+// lifetime, like notify.Service, so discovery/gossip keep running with
+// no Chat window open.
+func (s *Server) LANChatService() *lanchat.Service {
+	return s.lanchat
 }
 
 func (s *Server) SetNotify(n *notify.Service) {
@@ -733,6 +750,13 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 				}
 			}), cc, cr)
 			title = "Settings"
+		case "chat":
+			if s.lanchat == nil {
+				err = fmt.Errorf("LAN chat is unavailable (failed to start)")
+			} else {
+				surf, err = surface.NewAppSurface(id, "Chat", chat.New(s.lanchat), cc, cr)
+				title = "Chat"
+			}
 		case "manual", "help":
 			w, h = 72, 22
 			cc, cr = w-2, h-2

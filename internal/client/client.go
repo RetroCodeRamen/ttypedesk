@@ -200,6 +200,11 @@ func (c *Client) Close() {
 	// race or panic; leaving raw/alt-screen mode is what "locks" the session.
 	c.finiScreen()
 	c.srv.CloseAll()
+	// lanchat.Service has real goroutines/sockets (unlike notify.Service,
+	// which needs no such hook) — close it after windows are torn down.
+	if lc := c.srv.LANChatService(); lc != nil {
+		_ = lc.Close()
+	}
 }
 
 func (c *Client) finiScreen() {
