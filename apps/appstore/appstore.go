@@ -47,6 +47,7 @@ type installResult struct {
 // App is the App Store window.
 type App struct {
 	cfg     config.Config
+	getCfg  func() config.Config
 	onSave  func(config.Config)
 	ctx     *uiapp.Context
 	rows    []row
@@ -63,9 +64,23 @@ type App struct {
 	installCh chan installResult
 }
 
-func New(cfg config.Config, onSave func(config.Config)) *App {
+// New creates an App Store window. getCfg returns the *current* desktop
+// config at call time (typically s.cfg's live value, not a snapshot) —
+// this window can stay open a long time (its own detect loop polls every
+// ~2s), and other windows can save config changes while it's open; every
+// registration this app makes gets applied on top of whatever getCfg
+// returns right then, not the config.Config that happened to be current
+// when this window was first opened. Without that, this app's own
+// persist() would silently revert any such changes made in the
+// meantime — the exact "installed apps occasionally disappear until you
+// reopen the App Store" symptom this fixes (this app's own detect+
+// register loop is what re-adds them on reopen; getCfg means a later
+// registration from *this same still-open window* can't undo them
+// again).
+func New(cfg config.Config, onSave func(config.Config), getCfg func() config.Config) *App {
 	return &App{
 		cfg:        cfg,
+		getCfg:     getCfg,
 		onSave:     onSave,
 		loading:    true,
 		confirmIdx: -1,
@@ -143,6 +158,7 @@ func (a *App) onTimer() {
 		for i := range a.rows {
 			if detectEntry(a.rows[i].entry) {
 				a.rows[i].state = statusInstalled
+				a.refreshCfg()
 				if registerEntry(&a.cfg, a.rows[i].entry) {
 					a.persist()
 				}
@@ -166,6 +182,7 @@ func (a *App) onTimer() {
 		}
 		if detectEntry(a.rows[i].entry) {
 			a.rows[i].state = statusInstalled
+			a.refreshCfg()
 			if registerEntry(&a.cfg, a.rows[i].entry) {
 				a.persist()
 			}
@@ -179,6 +196,18 @@ func (a *App) onTimer() {
 func (a *App) persist() {
 	if a.onSave != nil {
 		a.onSave(a.cfg)
+	}
+}
+
+// refreshCfg replaces a.cfg with the live config (see New's doc comment)
+// right before a registerEntry call — safe because every mutation this
+// app makes to a.cfg is immediately persisted in the same tick (never
+// left pending across onTimer calls), so there's nothing of this app's
+// own to lose by re-syncing first. A no-op if getCfg wasn't supplied
+// (e.g. in tests that construct App directly).
+func (a *App) refreshCfg() {
+	if a.getCfg != nil {
+		a.cfg = a.getCfg()
 	}
 }
 

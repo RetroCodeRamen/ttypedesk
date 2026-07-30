@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
@@ -458,6 +459,19 @@ func (c *Config) normalize() {
 	}
 }
 
+// saveMu serializes writes to config.json. Several app windows (App
+// Store, Settings, Add/Manage Programs, ...) each hold their own
+// in-memory Config and can call Save concurrently from their own
+// goroutines — without this, two overlapping os.WriteFile calls race at
+// the OS level with no defined winner, and whichever happens to finish
+// last silently discards everything the other one just wrote (not a
+// merge — the whole file gets replaced each time). This doesn't fix an
+// app saving a stale snapshot (see appstore.go's getCfg for that half of
+// the picture), but it does guarantee Save itself is race-free and that
+// concurrent saves apply in some real order rather than corrupting each
+// other mid-write.
+var saveMu sync.Mutex
+
 func Save(cfg Config) error {
 	cfg.normalize()
 	path := Path()
@@ -468,5 +482,31 @@ func Save(cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+
+	saveMu.Lock()
+	defer saveMu.Unlock()
+
+	// Write to a temp file in the same directory, then rename over the
+	// real path — atomic on the same filesystem, so a reader (including
+	// this same process's own hot-reload poll) never observes a
+	// truncated/partially-written config.json.
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".config.json.tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }

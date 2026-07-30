@@ -797,7 +797,7 @@ func (s *Server) createLocked(kind, title, appName, path, command string, args [
 				if s.onConfig != nil {
 					s.onConfig(nc)
 				}
-			}), cc, cr)
+			}, s.Config), cc, cr)
 			title = "App Store"
 		case "imageview":
 			app := imageview.NewDemo()
