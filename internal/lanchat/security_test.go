@@ -1,8 +1,10 @@
 package lanchat
 
 import (
+	"bufio"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -21,8 +23,15 @@ import (
 // This connects directly to a real Service's TCP listener (bypassing the
 // hello handshake entirely — the bug is in the raw read loop, which runs
 // before handshake completion too) and streams well past maxWireLineBytes
-// with no '\n', then confirms the connection gets closed (Scan() fails)
-// rather than the read continuing to buffer forever.
+// with no '\n'. It does *not* infer success from a write() error: TCP
+// send-side buffering means Write can keep "succeeding" locally for a
+// while even after the remote end has already closed its side (the
+// kernel absorbs it into the socket buffer regardless of whether
+// anything's still reading), so that's not a reliable signal here. It
+// verifies server-side closure directly instead — a Read on the same
+// connection surfacing EOF/reset well within a bounded deadline. If the
+// read is unbounded, no close ever happens and a Read attempt just
+// blocks until the deadline, which is a distinguishable timeout error.
 func TestUnterminatedLineDoesNotGrowMemoryUnbounded(t *testing.T) {
 	svc := newTestService(t, "Alice")
 
@@ -32,31 +41,43 @@ func TestUnterminatedLineDoesNotGrowMemoryUnbounded(t *testing.T) {
 	}
 	defer nc.Close()
 
-	// Stream well past the cap with no '\n' — if handleConn's read is
-	// truly unbounded, nothing here would ever return; the connection
-	// would just keep accepting bytes and growing its buffer forever.
+	// handleConn sends its own hello line immediately on accept, before
+	// ever reading anything from us — drain and discard it first so the
+	// later "did the server close on us" read isn't just picking that up
+	// instead.
+	nc.SetReadDeadline(time.Now().Add(5 * time.Second))
+	helloBuf := bufio.NewReader(nc)
+	if _, err := helloBuf.ReadBytes('\n'); err != nil {
+		t.Fatalf("reading server's initial hello: %v", err)
+	}
+
 	chunk := make([]byte, 64*1024)
 	for i := range chunk {
 		chunk[i] = 'A'
 	}
 	sent := 0
+	target := maxWireLineBytes + 4*1024*1024 // comfortably past the cap
 	nc.SetWriteDeadline(time.Now().Add(10 * time.Second))
-	for sent < maxWireLineBytes+4*1024*1024 { // comfortably past the cap
-		n, err := nc.Write(chunk)
+	for sent < target {
+		n, werr := nc.Write(chunk)
 		sent += n
-		if err != nil {
-			// The other end closed the connection once the cap was
-			// exceeded — exactly the expected outcome, not a test
-			// failure. A real unbounded reader would accept all of this
-			// without ever erroring.
-			return
+		if werr != nil {
+			break // the remote side is gone; nothing more to write
 		}
 	}
 
-	// If we got here, the server accepted more than maxWireLineBytes of
-	// unterminated data without ever closing the connection — the bug
-	// this test guards against.
-	t.Fatalf("wrote %d bytes (> maxWireLineBytes=%d) of unterminated data with no error — the read is unbounded again", sent, maxWireLineBytes)
+	nc.SetReadDeadline(time.Now().Add(5 * time.Second))
+	_, rerr := helloBuf.Read(make([]byte, 16)) // same reader as the hello drain — don't skip its internal buffer
+	if rerr == nil {
+		t.Fatal("server sent data back unexpectedly")
+	}
+	var ne net.Error
+	if errors.As(rerr, &ne) && ne.Timeout() {
+		t.Fatalf("server never closed the connection after %d bytes of unterminated data (read timed out instead of observing a close) — the read is unbounded again", sent)
+	}
+	// Any other error (EOF, connection reset, ...) confirms the server
+	// actually closed its side once the cap was exceeded — the expected,
+	// correct outcome.
 }
 
 // TestSendMessageRejectsOverlongBody guards SendMessage's own length
