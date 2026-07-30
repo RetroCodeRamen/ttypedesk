@@ -20,7 +20,7 @@ the desktop to be running.
 - [Notifications](#notifications)
 - [Amp (audio player)](#amp-audio-player)
 - [Vid (video player)](#vid-video-player)
-- [Chat (Matrix messenger)](#chat-matrix-messenger)
+- [Chat (decentralized LAN messenger)](#chat-decentralized-lan-messenger)
 - [Terminal features](#terminal-features)
 - [GUI–TUI App Bridge](#guitui-app-bridge)
 - [Remote attach](#remote-attach)
@@ -333,39 +333,57 @@ over SSH the same blunt way the Bridge's does today: a fixed lower
 budget (`config.OverSSH()`), not a live-measured one — resolution itself
 doesn't adapt yet.
 
-## Chat (Matrix messenger)
+## Chat (decentralized LAN messenger)
 
-Start ▸ Programs ▸ Chat, or the palette (`chat`). A text-only
-[Matrix](https://matrix.org/) client — TTYPE Desk never runs or manages a
-chat backend of its own; Chat just connects to a homeserver you already
-have an account on (`matrix.org` or any other). Built on
-[mautrix-go](https://github.com/mautrix/go), the same library `gomuks`
-(a real terminal Matrix client) is built on.
+Start ▸ Programs ▸ Chat, or the palette (`chat`). A fully decentralized,
+peer-to-peer chat for a trusted local network — there's no server, no
+homeserver, and no internet dependency; TTYPE Desk never runs or manages
+a chat backend at all, on the LAN or otherwise. Peers find each other via
+a UDP broadcast on the LAN and talk directly over TCP.
 
-First launch shows a login screen: homeserver, username, password.
-**Tab**/arrows move between fields, **Enter** advances (or logs in from
-the password field). Once connected: **Up**/**Down** switch rooms,
-typing composes a message, **Enter** sends it, **Backspace** edits.
-Room names come from the room's own `m.room.name` state, falling back to
-the raw room ID until that arrives. A message landing in any room other
-than the one currently in view posts a desktop notification — not real
-`m.mentions` parsing, just "a message arrived somewhere you're not
-looking," which covers the common case without needing to parse mention
-events specially; your own messages (echoed back by sync, like any
-client sees) and messages in the room already on screen don't notify.
+First launch asks for a display name (no login, no account) — this,
+together with a keypair generated and saved automatically the first
+time, is your identity to everyone else on the LAN. **Enter** confirms
+it. After that: **Tab** switches focus between the room list, the peers
+list, and the compose box; **Up**/**Down** navigate whichever list is
+focused; **Enter** selects a room, opens a DM with the selected peer, or
+sends whatever's in the compose box, depending on which panel has focus.
+Selecting **+ New room** at the top of the room list prompts for a name;
+**Enter** creates it, **Escape** cancels. The peers list shows everyone
+currently visible on the LAN (● online, ○ known but not currently seen)
+— selecting one opens (or creates) a direct message with them.
 
-The session token is saved to `~/.config/ttypedesk/credentials/` (never
-the password — that's only ever used for the initial login) so you don't
-re-login every time you open Chat; if the stored token's been revoked or
-expired, Chat quietly falls back to the login screen instead of getting
-stuck.
+Anyone can create a room, and a room's history syncs across every LAN
+computer that's a member of it: join a room and you converge on the same
+history everyone else in it already has, not just messages sent after
+you joined. Each computer keeps only the most recent 500 messages per
+room, saved to `~/.config/ttypedesk/lanchat/` so history survives a
+restart. A message landing in a room other than the one currently in
+view posts a desktop notification, the same "somewhere you're not
+looking" heuristic other apps in TTYPE Desk use.
 
-**E2EE is explicitly not built** — this is Phase 1 (plain Matrix text
-rooms) only. Encryption is a genuinely separate undertaking (device
-verification, key backup, cross-signing) rather than an incremental
-feature, so it stays a distinct future phase rather than something half-
-implemented here. Use unencrypted rooms, or accept that an encrypted
-room's messages won't decrypt in this client.
+Messages are **signed but not encrypted** — you can tell who really sent
+something and that it wasn't tampered with in transit, but content
+itself travels in the clear on the LAN. That's a deliberate scope
+decision for a trusted home/office network, not an oversight; hand-rolled
+end-to-end encryption done as an afterthought is a common source of real
+vulnerabilities. Settings ▸ LAN Chat lets you change your display name
+later, or regenerate your identity outright (immediate, no confirmation
+— you'll appear as a brand-new, unrecognized peer to everyone else
+afterward, since there's no central authority to reassign an old
+identity to a new key).
+
+### Matrix Chat
+
+The previous built-in messenger — a federated [Matrix](https://matrix.org/)
+client that connects to an existing homeserver you already have an
+account on (`matrix.org` or any other), built on
+[mautrix-go](https://github.com/mautrix/go) — has moved out of the core
+binary. It's still fully maintained and installable from the App Store
+(App Store ▸ Matrix Chat); once installed it runs and behaves exactly as
+it always did (login screen, room list, timeline, session persisted
+under `~/.config/ttypedesk/credentials/`, no E2EE in this first phase).
+See the App Store section below for installing it.
 
 ## Terminal features
 

@@ -200,24 +200,59 @@ Terminal-native video: live **frames → ASCII / half-block cells**, not a GUI n
 - [x] Pipes raw frames from an `ffmpeg` subprocess — never a linked decoder library, matching Amp and the Bridge's own Xvfb posture (soft runtime dependency)
 - [x] Audio track via the same decode-to-`Host.PlayAudio` path Amp uses (`internal/ffdecode.DecodeAudio`, shared) — decoded as its own separate ffmpeg process against the same file, not multiplexed through one process; a file with no audio track (or one that fails to decode) degrades to video-only rather than failing the whole thing
 
-## Messenger (no Desk-operated server)
+## Messenger (decentralized, LAN-only — no Desk-operated server)
 
-Native chat client that **connects to an existing network** — we do not run or manage a chat backend.
+The built-in **Chat** app is a fully decentralized, peer-to-peer messenger for a
+trusted local network — no server, no homeserver, no internet dependency at
+all. Peers announce themselves via a UDP broadcast beacon, identify with a
+locally-generated, persisted Ed25519 keypair (plus a user-chosen display
+name), and exchange messages directly over TCP. Anyone can create a room; a
+room's history gossip-syncs between whichever LAN peers are members, so a
+newly-joined peer converges on the same history everyone else already has.
+Each peer keeps only the most recent 500 messages per room, persisted to
+disk. Messages are signed (tamper-evident, verifiable sender) but not
+encrypted — content travels in the clear on the LAN, a deliberate scope
+decision for a trusted home/office network rather than risking hand-rolled
+E2E crypto as an afterthought.
 
-**Preferred backend: [Matrix](https://matrix.org/)** (open Client-Server API). Users register on a public homeserver (e.g. `matrix.org`) or any HS they already use; TTYPE Desk is just another client. Zero server ops on our side; E2EE and rooms come for free from the ecosystem.
+- [x] `internal/lanchat` — the protocol engine: identity (`crypto/ed25519`,
+      persisted under its own data dir, not `credstore` — one identity per
+      instance, not per real user account), discovery (fixed-port UDP
+      broadcast beacon, `SO_REUSEPORT` so more than one instance can run per
+      host), transport (TCP, connection-dedup by comparing peer IDs so
+      exactly one side dials), gossip (room_announce/room_join/history_sync/
+      message, content-hash deduped), rooms with no central uniqueness (a
+      hash of creator + name + timestamp), direct messages as an implicit
+      2-member room whose ID both sides derive independently from their
+      sorted peer IDs
+- [x] **Chat** app — `apps/chat`; first-run display-name picker (no login),
+      room list + online-peers list, timeline + compose, Tab to switch
+      panel — kept UI DOS/Win9x-adjacent (status bar, room list | messages)
+- [x] Settings → LAN Chat: edit display name, regenerate identity
+      (immediate — a deliberate "become a new identity" operation, since
+      there's no central authority to reassign an old one)
+- [x] Notifications for backgrounded-room activity via the shared system
+      notify service
+- [x] Shared background service (`internal/server`, like `notify.Service`) —
+      discovery and message receipt keep running even with no Chat window
+      open
 
-Alternatives if Matrix is too heavy for v1:
+### Matrix Chat (moved to the App Store)
 
-- **IRC** (Libera.Chat, etc.) — simplest protocol, great for hacker aesthetic, weaker DMs/history
-- **XMPP** — federated, many public servers; smaller modern client ecosystem than Matrix
+The previous built-in messenger — a [Matrix](https://matrix.org/) client via
+[mautrix-go](https://github.com/mautrix/go), federated, connects to an
+existing homeserver — is no longer built into the core binary. It's still
+fully maintained as `apps/matrixchat`, installable from the App Store (see
+`docs/appstore.md`), and runs out-of-process via `pkg/extapprun` with no
+functional changes from its original in-process form.
 
-Avoid building around Discord/Slack as the primary path (proprietary APIs / ToS). Bridges into Matrix stay an upstream concern, not ours.
-
-- [x] **Chat** app — `apps/chat`, using [mautrix-go](https://github.com/mautrix/go); login (homeserver + username + password), room list, timeline, send text
-- [x] Persist session token under `~/.config/ttypedesk/` (not in git) — `internal/credstore`, same store OAuth2 calendar tokens use
-- [x] Notifications for backgrounded-room activity via system notify service — not real `m.mentions` parsing yet, just "a message arrived in a room that isn't the one in view" (the common case that actually needs a nudge); suppressed for the user's own echoed messages and the currently-selected room
-- [x] Phase 1: Matrix text rooms (shipped); Phase 2: E2EE, attachments/reactions — explicitly not built, a real separate undertaking (device verification, key backup, cross-signing), not an incremental add
-- [x] Design note: kept UI DOS/Win9x-adjacent (status bar, room list | messages)
+- [x] Login (homeserver + username + password), room list, timeline, send text
+- [x] Persist session token under `~/.config/ttypedesk/` (not in git) —
+      `internal/credstore`, same store OAuth2 calendar tokens use
+- [x] Notifications for backgrounded-room activity, same pattern as Chat above
+- [x] Phase 1: Matrix text rooms (shipped); Phase 2: E2EE, attachments/reactions
+      — explicitly not built, a real separate undertaking (device
+      verification, key backup, cross-signing), not an incremental add
 
 ## Remote attach
 
