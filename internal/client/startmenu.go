@@ -1,10 +1,10 @@
 package client
 
 import (
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
 )
 
 // startMenuItem is one row in the Start menu (leaf or submenu).

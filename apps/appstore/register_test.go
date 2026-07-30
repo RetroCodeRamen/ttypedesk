@@ -3,7 +3,7 @@ package appstore
 import (
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
 )
 
 func TestRegisterEntryNewProgramNoCollision(t *testing.T) {

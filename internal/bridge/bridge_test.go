@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
 )
 
 // requireX11 skips the test unless both Xvfb and the given guest command

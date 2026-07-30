@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
 )
 
 func branchOrDefault(branch string) string {

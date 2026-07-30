@@ -4,7 +4,7 @@ package proto
 import (
 	"encoding/json"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 const Version = 1

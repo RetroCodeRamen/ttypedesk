@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ttypedesk/ttypedesk/internal/vterm"
+	"github.com/RetroCodeRamen/ttypedesk/internal/vterm"
 )
 
 func main() {

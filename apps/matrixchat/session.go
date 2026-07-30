@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // sessionKey is the credstore key the Matrix session (homeserver, user,

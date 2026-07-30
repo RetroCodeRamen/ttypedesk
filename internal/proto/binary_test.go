@@ -5,7 +5,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 func TestWriteReadFrameRoundTrip(t *testing.T) {

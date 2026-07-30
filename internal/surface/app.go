@@ -5,9 +5,9 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/ttypedesk/ttypedesk/internal/slog"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // TitleSink receives title changes from the App SDK Host.

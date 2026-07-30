@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/proto"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // ExtAppSurface hosts an out-of-process app: any executable speaking the

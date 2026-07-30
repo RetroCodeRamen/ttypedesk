@@ -3,8 +3,8 @@ package config
 import (
 	"strings"
 
-	"github.com/ttypedesk/ttypedesk/assets"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/assets"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 // Theme pack IDs / display names.

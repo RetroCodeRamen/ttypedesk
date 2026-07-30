@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ttypedesk/ttypedesk/apps/matrixchat"
-	"github.com/ttypedesk/ttypedesk/pkg/extapprun"
+	"github.com/RetroCodeRamen/ttypedesk/apps/matrixchat"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/extapprun"
 )
 
 func main() {

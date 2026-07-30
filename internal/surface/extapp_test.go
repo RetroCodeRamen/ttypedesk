@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/audio"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/audio"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // helloBinary is built once from cmd/extapp-hello — a real reference

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/session"
-	"github.com/ttypedesk/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/session"
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
 )
 
 // newTestServer returns a Server sized like a typical host terminal, using

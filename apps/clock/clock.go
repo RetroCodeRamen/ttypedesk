@@ -3,8 +3,8 @@ package clock
 import (
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // App is a reference native clock application.

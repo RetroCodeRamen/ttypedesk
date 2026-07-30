@@ -3,8 +3,8 @@ package client
 import (
 	"testing"
 
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
 )
 
 func makeRow(cols int, text string) []cell.Cell {

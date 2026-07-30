@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/proto"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 func main() {

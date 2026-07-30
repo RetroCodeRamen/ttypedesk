@@ -4,10 +4,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/slog"
-	"github.com/ttypedesk/ttypedesk/internal/tty"
-	"github.com/ttypedesk/ttypedesk/internal/vterm"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/internal/tty"
+	"github.com/RetroCodeRamen/ttypedesk/internal/vterm"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 // PtySurface hosts a shell/TUI in a PTY + libvterm.

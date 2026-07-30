@@ -12,11 +12,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/ttypedesk/ttypedesk/internal/attach"
-	"github.com/ttypedesk/ttypedesk/internal/client"
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/server"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/internal/attach"
+	"github.com/RetroCodeRamen/ttypedesk/internal/client"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
 )
 
 // version is baked in at build time via build.sh's -ldflags -X, computed by

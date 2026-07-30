@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 // roundTrip encodes payload through Envelope/JSON exactly as the wire does,

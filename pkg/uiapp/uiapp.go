@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 )
 
 // App is a first-class windowed application (no PTY).

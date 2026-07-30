@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/calsync"
-	"github.com/ttypedesk/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/calsync"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
 )
 
 // syncWindow is how far ahead/behind "now" a sync fetches — wide enough to

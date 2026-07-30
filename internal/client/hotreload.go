@@ -4,8 +4,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
 )
 
 // pollConfigReload notices external edits to config.json (hand-edited, synced

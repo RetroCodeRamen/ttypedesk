@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
 )
 
 func main() {

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 // Theme holds chrome colors. Shipped packs live in themes.go (XP, Scarlet, Bumble, Bubble, Sprout).

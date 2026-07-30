@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/proto"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // fakeApp is a uiapp.App test double whose Handle method dispatches on

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // installEntry downloads an entry's install script and runs it in a new

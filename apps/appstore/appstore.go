@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 )
 
 type status int

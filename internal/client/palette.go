@@ -3,12 +3,12 @@ package client
 import (
 	"strings"
 
+	"github.com/RetroCodeRamen/ttypedesk/internal/clip"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/palette"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/internal/clip"
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/palette"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
 )
 
 func (c *Client) openPalette() {

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ttypedesk/ttypedesk/internal/calsync"
-	"github.com/ttypedesk/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/calsync"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
 )
 
 // calMsg is how a background OAuth2 connect flow (calsync.Connect) reports

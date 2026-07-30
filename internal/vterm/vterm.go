@@ -185,7 +185,7 @@ import (
 	"sync"
 	"unsafe"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 var (

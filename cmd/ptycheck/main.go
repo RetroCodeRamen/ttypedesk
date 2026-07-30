@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
 )
 
 func main() {

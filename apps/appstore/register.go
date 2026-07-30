@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
 )
 
 // registerEntry upserts an entry's launchers into cfg.Programs. Matching is

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 )
 
 // Hit is one ranked result in the command palette.

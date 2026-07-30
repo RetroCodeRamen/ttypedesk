@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/calsync"
+	"github.com/RetroCodeRamen/ttypedesk/internal/calsync"
 )
 
 func TestMergeSyncedReplacesOnlyMatchingSource(t *testing.T) {

@@ -1,6 +1,6 @@
 package uiapp
 
-import "github.com/ttypedesk/ttypedesk/pkg/cell"
+import "github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 
 // ScrollState tracks a 1D scrollable viewport (row units for vertical bars).
 type ScrollState struct {

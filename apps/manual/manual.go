@@ -4,9 +4,9 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 )
 
 // App is the in-desk Manual reader (TOC + chapter body).

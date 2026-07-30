@@ -3,9 +3,9 @@ package client
 import (
 	"testing"
 
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/server"
 )
 
 // newHitTestClient builds a Client backed by a tcell.SimulationScreen (no

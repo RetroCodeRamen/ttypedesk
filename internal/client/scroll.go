@@ -1,9 +1,9 @@
 package client
 
 import (
-	"github.com/ttypedesk/ttypedesk/internal/server"
-	"github.com/ttypedesk/ttypedesk/internal/surface"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 func scrollBarGeom(win *server.Window) (x, y, h int) {

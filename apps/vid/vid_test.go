@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/audio"
-	"github.com/ttypedesk/ttypedesk/internal/ffdecode"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/audio"
+	"github.com/RetroCodeRamen/ttypedesk/internal/ffdecode"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 func requireFFmpeg(t *testing.T) {

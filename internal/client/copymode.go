@@ -1,10 +1,10 @@
 package client
 
 import (
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uwidth"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/internal/surface"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uwidth"
 )
 
 // openCopyMode enters tmux-like keyboard scrollback selection on the

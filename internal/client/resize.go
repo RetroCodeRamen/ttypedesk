@@ -1,6 +1,6 @@
 package client
 
-import "github.com/ttypedesk/ttypedesk/internal/server"
+import "github.com/RetroCodeRamen/ttypedesk/internal/server"
 
 // resize edge bitflags
 const (

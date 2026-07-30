@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/audio"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/audio"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // fakeHost wires only PlayAudio to the real internal/audio package —

@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/proto"
-	"github.com/ttypedesk/ttypedesk/internal/server"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
 )
 
 func TestRemoteKeyEvent(t *testing.T) {

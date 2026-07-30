@@ -6,7 +6,7 @@ import (
 	"image/color"
 	"strings"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 const halfBlock = '▄'

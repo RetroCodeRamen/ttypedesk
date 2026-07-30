@@ -3,7 +3,7 @@ package bridge
 import (
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 func TestCompositeTextPlacesCharactersInMappedRect(t *testing.T) {

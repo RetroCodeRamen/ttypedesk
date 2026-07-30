@@ -6,9 +6,9 @@ import (
 	"image/color"
 	"os"
 
-	"github.com/ttypedesk/ttypedesk/internal/gfx"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/gfx"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 
 	_ "image/gif"
 	_ "image/jpeg"

@@ -3,7 +3,7 @@ package amp
 import (
 	"sync"
 
-	"github.com/ttypedesk/ttypedesk/internal/ffdecode"
+	"github.com/RetroCodeRamen/ttypedesk/internal/ffdecode"
 )
 
 // visBars is how many amplitude bars the visualizer shows — not a real

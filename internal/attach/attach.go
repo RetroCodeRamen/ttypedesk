@@ -9,13 +9,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RetroCodeRamen/ttypedesk/internal/audio"
+	"github.com/RetroCodeRamen/ttypedesk/internal/audiocap"
+	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 	"github.com/gdamore/tcell/v2"
-	"github.com/ttypedesk/ttypedesk/internal/audio"
-	"github.com/ttypedesk/ttypedesk/internal/audiocap"
-	"github.com/ttypedesk/ttypedesk/internal/proto"
-	"github.com/ttypedesk/ttypedesk/internal/server"
-	"github.com/ttypedesk/ttypedesk/internal/surface"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
 )
 
 // Serve listens on a Unix socket and streams binary cell-diff frames to

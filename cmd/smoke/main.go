@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/ttypedesk/ttypedesk/internal/gfx"
-	"github.com/ttypedesk/ttypedesk/internal/proto"
-	"github.com/ttypedesk/ttypedesk/internal/vterm"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/internal/gfx"
+	"github.com/RetroCodeRamen/ttypedesk/internal/proto"
+	"github.com/RetroCodeRamen/ttypedesk/internal/vterm"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 func main() {

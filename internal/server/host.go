@@ -1,11 +1,11 @@
 package server
 
 import (
-	"github.com/ttypedesk/ttypedesk/internal/audio"
-	"github.com/ttypedesk/ttypedesk/internal/clip"
-	"github.com/ttypedesk/ttypedesk/internal/credstore"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
-	"github.com/ttypedesk/ttypedesk/pkg/uiapp"
+	"github.com/RetroCodeRamen/ttypedesk/internal/audio"
+	"github.com/RetroCodeRamen/ttypedesk/internal/clip"
+	"github.com/RetroCodeRamen/ttypedesk/internal/credstore"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/uiapp"
 )
 
 // appHost exposes desktop services to a native uiapp.

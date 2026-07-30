@@ -13,13 +13,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/gfx"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/internal/surface"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 	"github.com/jezek/xgb"
 	"github.com/jezek/xgb/xproto"
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/gfx"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
-	"github.com/ttypedesk/ttypedesk/internal/surface"
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
 )
 
 // captureFPS matches the attach/remote snapshot cadence elsewhere in the

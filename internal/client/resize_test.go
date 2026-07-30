@@ -3,7 +3,7 @@ package client
 import (
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
 )
 
 func TestHitResizeEdgesNilAndMaximized(t *testing.T) {

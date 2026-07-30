@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
 )
 
 func TestLeadOrDefault(t *testing.T) {

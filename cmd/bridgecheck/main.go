@@ -11,7 +11,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/bridge"
+	"github.com/RetroCodeRamen/ttypedesk/internal/bridge"
 )
 
 func main() {

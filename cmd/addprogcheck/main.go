@@ -5,9 +5,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/config"
-	"github.com/ttypedesk/ttypedesk/internal/server"
-	"github.com/ttypedesk/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/internal/config"
+	"github.com/RetroCodeRamen/ttypedesk/internal/server"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
 )
 
 func main() {

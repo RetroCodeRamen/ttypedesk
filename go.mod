@@ -1,4 +1,4 @@
-module github.com/ttypedesk/ttypedesk
+module github.com/RetroCodeRamen/ttypedesk
 
 go 1.24.4
 

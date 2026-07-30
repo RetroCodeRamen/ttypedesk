@@ -3,7 +3,7 @@ package server
 import (
 	"testing"
 
-	"github.com/ttypedesk/ttypedesk/internal/clip"
+	"github.com/RetroCodeRamen/ttypedesk/internal/clip"
 )
 
 // TestAppHostClipboardDelegatesToClipPackage confirms appHost.ClipboardGet/

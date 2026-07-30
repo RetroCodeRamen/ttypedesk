@@ -1,7 +1,7 @@
 package surface
 
 import (
-	"github.com/ttypedesk/ttypedesk/pkg/cell"
+	"github.com/RetroCodeRamen/ttypedesk/pkg/cell"
 )
 
 // InputEvent is a normalized input event for surfaces.

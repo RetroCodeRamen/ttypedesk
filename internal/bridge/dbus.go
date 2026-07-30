@@ -7,7 +7,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/ttypedesk/ttypedesk/internal/slog"
+	"github.com/RetroCodeRamen/ttypedesk/internal/slog"
 )
 
 // setupATSPI best-effort spins up a private session bus + at-spi2-registryd
