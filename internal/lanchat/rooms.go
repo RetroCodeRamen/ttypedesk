@@ -103,6 +103,9 @@ func (s *Service) DMRoom(peer PeerID) RoomID {
 // and floods it to every peer subscribed to that room (peers who've
 // sent us a room_join for it).
 func (s *Service) SendMessage(room RoomID, body string) error {
+	if n := len([]rune(body)); n > maxMessageBodyRunes {
+		return fmt.Errorf("lanchat: message too long (%d runes, max %d)", n, maxMessageBodyRunes)
+	}
 	s.mu.Lock()
 	r, ok := s.rooms[room]
 	if !ok || !r.Joined {
@@ -230,8 +233,18 @@ func (s *Service) applyRoomJoin(from *peerConn, id RoomID, joiner PeerID) {
 // own, deduping by content-hash ID exactly like applyIncomingMessage —
 // history_sync is just a batch of the same kind of message.
 func (s *Service) applyHistorySync(msg wireHistorySyncMsg) {
+	// A legitimate history_sync never carries more than maxRoomMessages —
+	// that's the cap the sender itself stores under. A peer sending more
+	// is either buggy or deliberately trying to force excessive signature
+	// verification work on us from a single envelope; process only the
+	// newest maxRoomMessages and ignore the rest, exactly as if the
+	// sender had capped it correctly.
+	msgs := msg.Messages
+	if len(msgs) > maxRoomMessages {
+		msgs = msgs[len(msgs)-maxRoomMessages:]
+	}
 	changed := false
-	for _, m := range msg.Messages {
+	for _, m := range msgs {
 		if s.ingestMessage(msg.RoomID, m) {
 			changed = true
 		}
@@ -268,6 +281,13 @@ func (s *Service) applyIncomingMessage(room RoomID, m Message, from PeerID) {
 // newly added (false for a duplicate or a signature that didn't
 // verify).
 func (s *Service) ingestMessage(room RoomID, m Message) bool {
+	// Defense in depth: SendMessage rejects an over-length body at the
+	// source, but a modified/malicious peer can send whatever it wants
+	// over the wire — never trust that our own local validation was
+	// applied on the sending end.
+	if len([]rune(m.Body)) > maxMessageBodyRunes {
+		return false
+	}
 	if err := verifyMessage(room, m); err != nil {
 		return false
 	}

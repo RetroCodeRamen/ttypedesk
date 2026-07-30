@@ -36,6 +36,24 @@ import (
 // memory and on disk — the newest maxRoomMessages, oldest dropped first.
 const maxRoomMessages = 500
 
+// maxMessageBodyRunes bounds a single message's length — this is a chat
+// app, not a file-transfer tool. Enforced both at the source (SendMessage
+// rejects anything longer before it's ever signed/sent) and defensively
+// on ingest (ingestMessage drops anything longer regardless of source),
+// since a modified/malicious peer on the LAN isn't bound by our own
+// SendMessage check.
+const maxMessageBodyRunes = 4000
+
+// maxWireLineBytes bounds a single NDJSON line read off the wire (see
+// transport.go's readLine). Sized to comfortably fit a legitimate full
+// history_sync — maxRoomMessages messages, each up to maxMessageBodyRunes
+// runes plus signature/metadata overhead — while still being a hard,
+// finite cap: without one, bufio.Reader.ReadBytes grows its buffer
+// without limit, so a peer that just never sends '\n' can grow this
+// process's memory without bound (a real, previously-unbounded DoS this
+// closes).
+const maxWireLineBytes = 8 << 20 // 8MB
+
 // PeerID is a peer's Ed25519 public key, hex-encoded — both a stable
 // identity and directly verifiable (no separate registration or trust
 // step; the key *is* the identity).

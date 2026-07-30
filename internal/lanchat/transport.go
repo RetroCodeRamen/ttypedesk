@@ -143,7 +143,16 @@ func (s *Service) handleConn(nc net.Conn, weDialed bool) {
 	}()
 
 	pc := &peerConn{nc: nc, w: bufio.NewWriter(nc)}
-	r := bufio.NewReader(nc)
+	// bufio.Scanner, not bufio.Reader.ReadBytes: ReadBytes has no maximum
+	// line length and grows its buffer without bound as long as bytes
+	// keep arriving without a '\n' — any connected peer (no auth gates a
+	// connection on this LAN-trust-model protocol) could send an
+	// unterminated stream and grow this process's memory until it's
+	// killed. Buffer(_, maxWireLineBytes) makes Scan() fail once a single
+	// line exceeds that cap, which — same as any other malformed input —
+	// just ends this connection rather than the process.
+	scanner := bufio.NewScanner(nc)
+	scanner.Buffer(make([]byte, 4096), maxWireLineBytes)
 
 	// Captured once, not re-read per use below: a consistent view of our
 	// own identity for the whole handshake, and — since it's read via
@@ -154,11 +163,10 @@ func (s *Service) handleConn(nc net.Conn, weDialed bool) {
 	if err := pc.send(wireHello, wireHelloMsg{PeerID: self, Name: s.selfName()}); err != nil {
 		return
 	}
-	line, err := r.ReadBytes('\n')
-	if err != nil {
+	if !scanner.Scan() {
 		return
 	}
-	env, err := decodeWire(line)
+	env, err := decodeWire(scanner.Bytes())
 	if err != nil || env.Type != wireHello {
 		return
 	}
@@ -241,12 +249,8 @@ func (s *Service) handleConn(nc net.Conn, weDialed bool) {
 
 	s.syncOnConnect(pc)
 
-	for {
-		line, err := r.ReadBytes('\n')
-		if err != nil {
-			return
-		}
-		env, err := decodeWire(line)
+	for scanner.Scan() {
+		env, err := decodeWire(scanner.Bytes())
 		if err != nil {
 			continue
 		}
