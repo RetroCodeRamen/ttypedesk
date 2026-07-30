@@ -414,8 +414,8 @@ func (s *Server) CreateProgram(p config.Program) (*Window, error) {
 
 // launchProgramWithArg is CreateProgram plus an optional trailing argument
 // (shell-quoted), used to hand a path to an external file manager. extraArg
-// is ignored for a Bridge program — there's no file-manager use case for
-// handing a bridged GUI app a trailing path argument today.
+// is ignored for a Bridge or ExtApp program — there's no file-manager use
+// case for handing either a trailing path argument today.
 func (s *Server) launchProgramWithArg(p config.Program, extraArg string) (*Window, error) {
 	name := p.Name
 	if name == "" {
@@ -423,6 +423,13 @@ func (s *Server) launchProgramWithArg(p config.Program, extraArg string) (*Windo
 	}
 	if p.Bridge {
 		return s.createBridgeProgram(config.ProgramAction(p.ID), name, p.Command)
+	}
+	if p.ExtApp {
+		parts := strings.Fields(p.Command)
+		if len(parts) == 0 {
+			return nil, fmt.Errorf("extapp program %q has an empty command", p.ID)
+		}
+		return s.createExtAppProgram(config.ProgramAction(p.ID), name, parts[0], parts[1:])
 	}
 	shell := s.cfg.Shell
 	cmd := p.Command
@@ -448,6 +455,29 @@ func (s *Server) createBridgeProgram(launch, title, command string) (*Window, er
 	s.mu.Lock()
 	win.Launch = launch
 	s.mu.Unlock()
+	return win, nil
+}
+
+// createExtAppProgram opens a registered ExtApp-backed program (App
+// Store's "ext_app" register field) with a pinned prog: launch key —
+// same reasoning as createBridgeProgram: re-launching this program later
+// (desktop icon, session restore) needs to resolve back through
+// prog:<id>, not the raw extapp:<command> action.
+func (s *Server) createExtAppProgram(launch, title, command string, args []string) (*Window, error) {
+	s.mu.Lock()
+	win, err := s.createLocked("extapp", title, "", "", command, args, true)
+	s.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+	s.mu.Lock()
+	win.Launch = launch
+	s.mu.Unlock()
+	if err := s.bindNativeApp(win); err != nil {
+		slog.Error("BindHost failed id=%s: %v", win.ID, err)
+		s.CloseWindow(win.ID)
+		return nil, err
+	}
 	return win, nil
 }
 

@@ -328,6 +328,25 @@ func TestCreateProgramWithoutBridgeStillUsesShell(t *testing.T) {
 	}
 }
 
+// TestCreateProgramExtAppRoutesThroughExtAppNotShell confirms a Program
+// with ExtApp:true is dispatched to the out-of-process App SDK path, not
+// wrapped as a shell command in a PTY — same contrastive-error technique
+// as the Bridge test above: a bogus binary name fails completely
+// differently (a real exec.Command lookup error) than "sh started fine,
+// the command inside it just doesn't exist."
+func TestCreateProgramExtAppRoutesThroughExtAppNotShell(t *testing.T) {
+	s := newTestServer()
+	p := config.Program{ID: "p3", Name: "Definitely Not A Shell Command", Command: "totally-bogus-extapp-binary-xyz", ExtApp: true}
+	if _, err := s.CreateProgram(p); err == nil {
+		t.Fatal("expected an error creating an ExtApp program with a nonexistent binary")
+	} else if !strings.Contains(err.Error(), "totally-bogus-extapp-binary-xyz") {
+		t.Fatalf("error = %q, want it to mention the missing binary (i.e. actually routed through extapp)", err.Error())
+	}
+	if len(s.Windows()) != 0 {
+		t.Fatalf("a failed ExtApp program launch should not leave a window behind, got %d", len(s.Windows()))
+	}
+}
+
 func TestCaptureAndRestoreSessionRoundTrips(t *testing.T) {
 	s := newTestServer()
 	a, _ := s.CreateApp("clock", "Clock")

@@ -8,15 +8,18 @@ const (
 
 // Program is a user-registered app: usually a shell command run in a PTY
 // window, or — if Bridge is set — an X11 GUI app launched through the
-// GUI-TUI Bridge (see internal/bridge) instead.
+// GUI-TUI Bridge (see internal/bridge) instead, or — if ExtApp is set —
+// an out-of-process App SDK binary (see internal/surface.ExtAppSurface,
+// docs/extapp.md) instead. At most one of Bridge/ExtApp should be set.
 type Program struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`    // display name in TTYPE Desk (e.g. "Task Manager")
-	Command string `json:"command"` // run via $SHELL -c (e.g. "htop"), or the X11 command if Bridge
+	Command string `json:"command"` // run via $SHELL -c (e.g. "htop"), or the X11/extapp command if Bridge/ExtApp
 	Icon    string `json:"icon"`
-	Menu    string `json:"menu"`             // programs | system
-	Desktop bool   `json:"desktop"`          // keep a desktop shortcut in sync
-	Bridge  bool   `json:"bridge,omitempty"` // launch Command via the GUI-TUI Bridge, not a shell PTY
+	Menu    string `json:"menu"`              // programs | system
+	Desktop bool   `json:"desktop"`           // keep a desktop shortcut in sync
+	Bridge  bool   `json:"bridge,omitempty"`  // launch Command via the GUI-TUI Bridge, not a shell PTY
+	ExtApp  bool   `json:"ext_app,omitempty"` // launch Command as an out-of-process App SDK binary, not a shell PTY
 }
 
 // MenuFolder returns programs or system (default programs).

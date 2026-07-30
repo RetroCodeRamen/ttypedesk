@@ -26,6 +26,10 @@ func registerEntry(cfg *config.Config, e RemoteEntry) bool {
 				p.Bridge = w.Bridge
 				changed = true
 			}
+			if p.ExtApp != w.ExtApp {
+				p.ExtApp = w.ExtApp
+				changed = true
+			}
 			if w.SetRole != "" && applySetRole(cfg, w.SetRole, w.ID) {
 				changed = true
 			}
@@ -43,6 +47,7 @@ func registerEntry(cfg *config.Config, e RemoteEntry) bool {
 			Menu:    menu,
 			Desktop: false,
 			Bridge:  w.Bridge,
+			ExtApp:  w.ExtApp,
 		})
 		if w.SetRole != "" {
 			applySetRole(cfg, w.SetRole, w.ID)

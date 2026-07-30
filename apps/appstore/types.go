@@ -43,6 +43,13 @@ type RegisterEntry struct {
 	// real X11 app) instead of as a shell command in a PTY — for
 	// catalog entries that are themselves X11 GUI programs.
 	Bridge bool `json:"bridge,omitempty"`
+	// ExtApp, if true, launches Command as an out-of-process App SDK
+	// binary (pkg/extapprun; see docs/extapp.md) instead of as a shell
+	// command in a PTY — for catalog entries that are themselves a
+	// TTYPE Desk app built to run standalone (e.g. Matrix Chat).
+	// Mutually exclusive with Bridge in practice, though nothing enforces
+	// that — an entry wouldn't set both.
+	ExtApp bool `json:"ext_app,omitempty"`
 }
 
 // catalogIndex is the root shape of a source repo's index.json.

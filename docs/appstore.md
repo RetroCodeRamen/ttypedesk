@@ -76,6 +76,17 @@ default; any source you add by hand gets the warning once.
       "register": [
         { "id": "gimp", "name": "GIMP", "command": "gimp", "icon": "🎨", "menu": "programs", "bridge": true }
       ]
+    },
+    {
+      "id": "matrixchat",
+      "name": "Matrix Chat",
+      "description": "Federated Matrix messenger (login required)",
+      "icon": "💬",
+      "detect": { "which": "matrixchat" },
+      "install": { "script": "install/matrixchat.sh" },
+      "register": [
+        { "id": "matrixchat", "name": "Matrix Chat", "command": "matrixchat", "icon": "💬", "menu": "programs", "ext_app": true }
+      ]
     }
   ]
 }
@@ -96,12 +107,19 @@ default; any source you add by hand gets the warning once.
 - `register[].command` is always a plain command name/line — `"carbonyl"`,
   not `"pty:carbonyl"`. There's no launch-action prefix syntax here; every
   registered program runs as `$SHELL -c "<command>"` in a PTY window unless
-  `bridge` is set (see next).
+  `bridge` or `ext_app` is set (see next two).
 - `register[].bridge: true` launches `command` through the GUI-TUI Bridge
   (a real X11 app, half-block rendered — see [gui-bridge.md](gui-bridge.md))
   instead of a shell PTY. Use this for entries that are themselves GUI
   applications, the same as ticking "Launch via GUI-TUI Bridge" in Add
   Program does for a hand-registered one.
+- `register[].ext_app: true` launches `command` as an out-of-process App
+  SDK binary (NDJSON over stdio — see [extapp.md](extapp.md)) instead of
+  a shell PTY. Use this for entries that are themselves a TTYPE Desk app
+  built to run standalone rather than linked into the core binary — the
+  Matrix Chat entry above is exactly this: `apps/matrixchat` run through
+  `pkg/extapprun`, installed via `go install .../cmd/matrixchat`. At most
+  one of `bridge`/`ext_app` should be set on an entry.
 
 ## Replacing a default app (`set_role`)
 

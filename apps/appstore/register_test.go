@@ -144,6 +144,43 @@ func TestRegisterEntryByIDUpdatesBridgeFlagInPlace(t *testing.T) {
 	}
 }
 
+func TestRegisterEntryNewProgramCarriesExtAppFlag(t *testing.T) {
+	cfg := &config.Config{}
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-matrixchat", Name: "Matrix Chat", Command: "matrixchat", ExtApp: true},
+	}}
+
+	registerEntry(cfg, e)
+
+	if len(cfg.Programs) != 1 {
+		t.Fatalf("Programs len = %d, want 1", len(cfg.Programs))
+	}
+	if !cfg.Programs[0].ExtApp {
+		t.Fatal("Programs[0].ExtApp = false, want true")
+	}
+}
+
+func TestRegisterEntryByIDUpdatesExtAppFlagInPlace(t *testing.T) {
+	cfg := &config.Config{Programs: []config.Program{
+		{ID: "appstore-matrixchat", Name: "Matrix Chat", Command: "matrixchat", ExtApp: false},
+	}}
+	e := RemoteEntry{Register: []RegisterEntry{
+		{ID: "appstore-matrixchat", Name: "Matrix Chat", Command: "matrixchat", ExtApp: true},
+	}}
+
+	changed := registerEntry(cfg, e)
+
+	if !changed {
+		t.Fatal("registerEntry() = false, want true (ext_app flag changed)")
+	}
+	if len(cfg.Programs) != 1 {
+		t.Fatalf("Programs len = %d, want 1 (no duplicate)", len(cfg.Programs))
+	}
+	if !cfg.Programs[0].ExtApp {
+		t.Fatal("Programs[0].ExtApp = false, want true after update")
+	}
+}
+
 func TestRegisterEntrySetsRoleOnNewProgram(t *testing.T) {
 	cfg := &config.Config{}
 	e := RemoteEntry{Register: []RegisterEntry{
